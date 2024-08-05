@@ -8,7 +8,7 @@ import { sprintf } from 'sprintf-js'
 import { readSyncedSettings, writeMostRecentWalletsSelected, writeSyncedSettings } from '../actions/SettingsActions'
 import { ButtonsModal } from '../components/modals/ButtonsModal'
 import { Airship, showError, showToast } from '../components/services/AirshipInstance'
-import { FIO_WALLET_TYPE, getSpecialCurrencyInfo, SPECIAL_CURRENCY_INFO } from '../constants/WalletAndCurrencyConstants'
+import { getSpecialCurrencyInfo, SPECIAL_CURRENCY_INFO } from '../constants/WalletAndCurrencyConstants'
 import { lstrings } from '../locales/strings'
 import { selectDisplayDenomByCurrencyCode } from '../selectors/DenominationSelectors'
 import { Dispatch, RootState, ThunkAction } from '../types/reduxTypes'
@@ -18,7 +18,6 @@ import { getCurrencyCode, getToken, isKeysOnlyPlugin } from '../util/CurrencyInf
 import { getWalletName } from '../util/CurrencyWalletHelpers'
 import { fetchInfo } from '../util/network'
 import { convertCurrencyFromExchangeRates } from '../util/utils'
-import { refreshConnectedWallets } from './FioActions'
 
 export interface SelectWalletTokenParams {
   navigation: NavigationBase
@@ -101,9 +100,6 @@ function selectActivationRequiredWallet(navigation: NavigationBase, walletId: st
       })
       return true
     } else {
-      // Update all wallets' addresses. Hopefully gets the updated address for the next time
-      // We enter the activation-required wallet
-      await dispatch(updateWalletsRequest())
       // not activated yet
       // find fiat and crypto activation-required types and populate scene props
       navigation.push('createWalletAccountSetup', {
@@ -151,27 +147,6 @@ export function updateMostRecentWalletsSelected(walletId: string, tokenId: EdgeT
   }
 }
 
-export function updateWalletsRequest(): ThunkAction<Promise<void>> {
-  return async (dispatch, getState) => {
-    const state = getState()
-    const { account } = state.core
-    const { currencyWallets } = account
-
-    const fioWallets: EdgeCurrencyWallet[] = []
-    for (const walletId of Object.keys(currencyWallets)) {
-      if (currencyWallets[walletId].type === FIO_WALLET_TYPE) {
-        fioWallets.push(currencyWallets[walletId])
-      }
-    }
-    dispatch({
-      type: 'UPDATE_FIO_WALLETS',
-      data: { fioWallets }
-    })
-
-    await refreshConnectedWallets(dispatch, getState, currencyWallets)
-  }
-}
-
 const activateWalletTokens = async (
   dispatch: Dispatch,
   state: RootState,
@@ -214,7 +189,7 @@ const activateWalletTokens = async (
     const displayFee = div(nativeFee, feeDenom.multiplier, log10(feeDenom.multiplier))
     let fiatFee = convertCurrencyFromExchangeRates(state.exchangeRates, paymentCurrencyCode, defaultIsoFiat, exchangeNetworkFee)
     if (lt(fiatFee, '0.001')) fiatFee = '<0.001'
-    fiatFee = round(fiatFee, -3)
+    else fiatFee = round(fiatFee, -3)
     const feeString = `${displayFee} ${feeDenom.name} (${fiatFee} ${defaultFiat})`
     let bodyText = lstrings.activate_wallet_token_scene_body
 

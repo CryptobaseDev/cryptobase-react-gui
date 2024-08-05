@@ -239,6 +239,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                   "alignSelf": "stretch",
                   "backgroundColor": "rgba(255, 255, 255, 0)",
                   "flexDirection": "row",
+                  "flexShrink": 1,
                 },
                 {
                   "marginBottom": 11,
@@ -266,6 +267,11 @@ exports[`TransactionDetailsScene should render 1`] = `
             >
               <FastImageView
                 resizeMode="cover"
+                source={
+                  {
+                    "uri": "thumb/nail/path",
+                  }
+                }
                 style={
                   {
                     "bottom": 0,
@@ -466,6 +472,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -560,6 +567,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -744,6 +752,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -883,6 +892,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -977,6 +987,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -1115,6 +1126,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -1275,6 +1287,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -1487,6 +1500,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -1691,6 +1705,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -1851,6 +1866,7 @@ exports[`TransactionDetailsScene should render 1`] = `
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -2245,6 +2261,11 @@ exports[`TransactionDetailsScene should render 1`] = `
           >
             <FastImageView
               resizeMode="cover"
+              source={
+                {
+                  "uri": "https://content.edge.app/notifications/icon-lock.png",
+                }
+              }
               style={
                 {
                   "bottom": 0,
@@ -2617,6 +2638,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                   "alignSelf": "stretch",
                   "backgroundColor": "rgba(255, 255, 255, 0)",
                   "flexDirection": "row",
+                  "flexShrink": 1,
                 },
                 {
                   "marginBottom": 11,
@@ -2644,6 +2666,11 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
             >
               <FastImageView
                 resizeMode="cover"
+                source={
+                  {
+                    "uri": "thumb/nail/path",
+                  }
+                }
                 style={
                   {
                     "bottom": 0,
@@ -2844,6 +2871,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -2938,6 +2966,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -3122,6 +3151,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -3261,6 +3291,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -3355,6 +3386,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -3493,6 +3525,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -3653,6 +3686,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -3865,6 +3899,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -4069,6 +4104,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -4229,6 +4265,7 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
                     "alignSelf": "stretch",
                     "backgroundColor": "rgba(255, 255, 255, 0)",
                     "flexDirection": "row",
+                    "flexShrink": 1,
                   },
                   {
                     "marginBottom": 11,
@@ -4623,6 +4660,11 @@ exports[`TransactionDetailsScene should render with negative nativeAmount and fi
           >
             <FastImageView
               resizeMode="cover"
+              source={
+                {
+                  "uri": "https://content.edge.app/notifications/icon-lock.png",
+                }
+              }
               style={
                 {
                   "bottom": 0,

@@ -1,15 +1,12 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createDrawerNavigator } from '@react-navigation/drawer'
-import { DefaultTheme, NavigationContainer, useNavigation } from '@react-navigation/native'
+import { DefaultTheme, NavigationContainer } from '@react-navigation/native'
 import { createStackNavigator, StackNavigationOptions } from '@react-navigation/stack'
 import * as React from 'react'
 import { Platform } from 'react-native'
 
 import { getDeviceSettings } from '../actions/DeviceSettingsActions'
-import { logoutRequest } from '../actions/LoginActions'
-import { checkEnabledExchanges, showReEnableOtpModal } from '../actions/SettingsActions'
 import { SwapCreateScene as SwapCreateSceneComponent } from '../components/scenes/SwapCreateScene'
-import { HomeSceneUi4 as HomeSceneUi4Component } from '../components/ui4/scenes/HomeSceneUi4'
 import { ENV } from '../env'
 import { DEFAULT_EXPERIMENT_CONFIG, ExperimentConfig, getExperimentConfig } from '../experimentConfig'
 import { useAsyncEffect } from '../hooks/useAsyncEffect'
@@ -22,13 +19,11 @@ import { InfoDisplayScene } from '../plugins/gui/scenes/InfoDisplayScene'
 import { RewardsCardDashboardScene as RewardsCardListSceneComponent } from '../plugins/gui/scenes/RewardsCardDashboardScene'
 import { RewardsCardWelcomeScene as RewardsCardWelcomeSceneComponent } from '../plugins/gui/scenes/RewardsCardWelcomeScene'
 import { SepaFormScene } from '../plugins/gui/scenes/SepaFormScene'
-import { defaultAccount } from '../reducers/CoreReducer'
 import { useDispatch, useSelector } from '../types/reactRedux'
-import { AppParamList, NavigationBase } from '../types/routerTypes'
+import { AppParamList } from '../types/routerTypes'
 import { isMaestro } from '../util/maestro'
 import { logEvent } from '../util/tracking'
 import { ifLoggedIn } from './hoc/IfLoggedIn'
-import { useBackEvent } from './hoc/useBackEvent'
 import { BackButton } from './navigation/BackButton'
 import { CurrencySettingsTitle } from './navigation/CurrencySettingsTitle'
 import { EdgeHeader } from './navigation/EdgeHeader'
@@ -80,6 +75,7 @@ import { FioStakingOverviewScene as FioStakingOverviewSceneComponent } from './s
 import { GettingStartedScene } from './scenes/GettingStartedScene'
 import { GuiPluginListScene as GuiPluginListSceneComponent } from './scenes/GuiPluginListScene'
 import { GuiPluginViewScene as GuiPluginViewSceneComponent } from './scenes/GuiPluginViewScene'
+import { HomeScene as HomeSceneComponent } from './scenes/HomeScene'
 import { LoanCloseScene as LoanCloseSceneComponent } from './scenes/Loans/LoanCloseScene'
 import { LoanCreateConfirmationScene as LoanCreateConfirmationSceneComponent } from './scenes/Loans/LoanCreateConfirmationScene'
 import { LoanCreateScene as LoanCreateSceneComponent } from './scenes/Loans/LoanCreateScene'
@@ -109,6 +105,10 @@ import { SwapConfirmationScene as SwapConfirmationSceneComponent } from './scene
 import { SwapProcessingScene as SwapProcessingSceneComponent } from './scenes/SwapProcessingScene'
 import { SwapSettingsScene as SwapSettingsSceneComponent } from './scenes/SwapSettingsScene'
 import { SwapSuccessScene as SwapSuccessSceneComponent } from './scenes/SwapSuccessScene'
+import { SweepPrivateKeyCalculateFeeScene as SweepPrivateKeyCalculateFeeSceneComponent } from './scenes/SweepPrivateKeyCalculateFeeScene'
+import { SweepPrivateKeyCompletionScene as SweepPrivateKeyCompletionSceneComponent } from './scenes/SweepPrivateKeyCompletionScene'
+import { SweepPrivateKeyProcessingScene as SweepPrivateKeyProcessingSceneComponent } from './scenes/SweepPrivateKeyProcessingScene'
+import { SweepPrivateKeySelectCryptoScene as SweepPrivateKeySelectCryptoSceneComponent } from './scenes/SweepPrivateKeySelectCryptoScene'
 import { TransactionDetailsScene as TransactionDetailsSceneComponent } from './scenes/TransactionDetailsScene'
 import { TransactionList as TransactionListComponent } from './scenes/TransactionListScene'
 import { TransactionsExportScene as TransactionsExportSceneComponent } from './scenes/TransactionsExportScene'
@@ -118,7 +118,6 @@ import { WcConnectionsScene as WcConnectionsSceneComponent } from './scenes/WcCo
 import { WcConnectScene as WcConnectSceneComponent } from './scenes/WcConnectScene'
 import { WcDisconnectScene as WcDisconnectSceneComponent } from './scenes/WcDisconnectScene'
 import { WebViewScene as WebViewSceneComponent } from './scenes/WebViewScene'
-import { showError } from './services/AirshipInstance'
 import { useTheme } from './services/ThemeContext'
 import { MenuTabs } from './themed/MenuTabs'
 import { SideMenu } from './themed/SideMenu'
@@ -173,6 +172,10 @@ const LoanDetailsScene = ifLoggedIn(LoanDetailsSceneComponent)
 const LoanManageScene = ifLoggedIn(LoanManageSceneComponent)
 const LoanStatusScene = ifLoggedIn(LoanStatusSceneComponent)
 const ManageTokensScene = ifLoggedIn(ManageTokensSceneComponent)
+const SweepPrivateKeyCalculateFeeScene = ifLoggedIn(SweepPrivateKeyCalculateFeeSceneComponent)
+const SweepPrivateKeyCompletionScene = ifLoggedIn(SweepPrivateKeyCompletionSceneComponent)
+const SweepPrivateKeySelectCryptoScene = ifLoggedIn(SweepPrivateKeySelectCryptoSceneComponent)
+const SweepPrivateKeyProcessingScene = ifLoggedIn(SweepPrivateKeyProcessingSceneComponent)
 const MigrateWalletCalculateFeeScene = ifLoggedIn(MigrateWalletCalculateFeeSceneComponent)
 const MigrateWalletCompletionScene = ifLoggedIn(MigrateWalletCompletionSceneComponent)
 const MigrateWalletSelectCryptoScene = ifLoggedIn(MigrateWalletSelectCryptoSceneComponent)
@@ -203,7 +206,7 @@ const WcConnectionsScene = ifLoggedIn(WcConnectionsSceneComponent)
 const WcConnectScene = ifLoggedIn(WcConnectSceneComponent)
 const WcDisconnectScene = ifLoggedIn(WcDisconnectSceneComponent)
 const WebViewScene = ifLoggedIn(WebViewSceneComponent)
-const HomeSceneUi4 = ifLoggedIn(HomeSceneUi4Component)
+const HomeScene = ifLoggedIn(HomeSceneComponent)
 
 const Drawer = createDrawerNavigator<AppParamList>()
 const Stack = createStackNavigator<AppParamList>()
@@ -228,126 +231,187 @@ const firstSceneScreenOptions: StackNavigationOptions = {
   headerTitleAlign: 'center'
 }
 
-export const Main = () => {
-  const theme = useTheme()
-  const dispatch = useDispatch()
+// -------------------------------------------------------------------------
+// Tab router
+// -------------------------------------------------------------------------
 
-  // TODO: Create a new provider instead to serve the experimentConfig globally
-  const [experimentConfig, setExperimentConfig] = React.useState<ExperimentConfig | undefined>(isMaestro() ? DEFAULT_EXPERIMENT_CONFIG : undefined)
-
-  const [hasInitialScenesLoaded, setHasInitialScenesLoaded] = React.useState(false)
-
-  // Match react navigation theme background with the patina theme
-  const reactNavigationTheme = React.useMemo(() => {
-    return {
-      ...DefaultTheme,
-      colors: {
-        ...DefaultTheme.colors,
-        background: theme.backgroundGradientColors[0]
-      }
-    }
-  }, [theme])
-
-  const context = useSelector(state => state.core.context)
-  const { localUsers } = context
-
-  useMount(() => {
-    dispatch(logEvent('Start_App', { numAccounts: localUsers.length }))
-    if (localUsers.length === 0) {
-      dispatch(logEvent('Start_App_No_Accounts'))
-    } else {
-      dispatch(logEvent('Start_App_With_Accounts'))
-    }
-
-    // Used to re-enable animations to login scene:
-    setTimeout(() => {
-      setHasInitialScenesLoaded(true)
-    }, 0)
-  })
-
-  // Wait for the experiment config to initialize before rendering anything
-  useAsyncEffect(
-    async () => {
-      if (isMaestro()) return
-      setExperimentConfig(await getExperimentConfig())
-    },
-    [],
-    'setLegacyLanding'
-  )
-
-  const initialRouteName = ENV.USE_WELCOME_SCREENS && localUsers.length === 0 ? 'gettingStarted' : 'login'
-
+const EdgeHomeTabScreen = () => {
   return (
-    <>
-      {experimentConfig == null ? (
-        <LoadingSplashScreen />
-      ) : (
-        <NavigationContainer theme={reactNavigationTheme}>
-          <Stack.Navigator
-            initialRouteName={initialRouteName}
-            screenOptions={{
-              headerShown: false
-            }}
-          >
-            <Stack.Screen name="edgeApp" component={EdgeApp} />
-            <Stack.Screen name="gettingStarted" component={GettingStartedScene} initialParams={{ experimentConfig }} />
-            <Stack.Screen name="login" component={LoginScene} initialParams={{ experimentConfig }} options={{ animationEnabled: hasInitialScenesLoaded }} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      )}
-    </>
+    <Stack.Navigator initialRouteName="home" screenOptions={defaultScreenOptions}>
+      <Stack.Screen name="home" component={HomeScene} options={firstSceneScreenOptions} />
+    </Stack.Navigator>
   )
 }
 
-const EdgeApp = () => {
-  const backPressedOnce = React.useRef(false)
-  const account = useSelector(state => state.core.account)
-  const dispatch = useDispatch()
-  const navigation = useNavigation<NavigationBase>()
+const EdgeWalletsTabScreen = () => {
+  return (
+    <Stack.Navigator initialRouteName="walletList" screenOptions={defaultScreenOptions}>
+      <Stack.Screen
+        name="transactionDetails"
+        component={TransactionDetailsScene}
+        options={{
+          headerTitle: () => <TransactionDetailsTitle />
+        }}
+      />
+      <Stack.Screen name="walletList" component={WalletListScene} options={firstSceneScreenOptions} />
+      <Stack.Screen
+        name="transactionList"
+        component={TransactionList}
+        options={{ headerTitle: () => <ParamHeaderTitle<'transactionList'> fromParams={params => params.walletName} /> }}
+      />
+    </Stack.Navigator>
+  )
+}
 
-  useBackEvent(() => {
-    // Allow back if logged out or this is the second back press
-    if (account === defaultAccount || backPressedOnce.current) {
-      dispatch(logoutRequest(navigation)).catch(err => showError(err))
-      return true
-    }
-    backPressedOnce.current = true
+const EdgeBuyTabScreen = () => {
+  return (
+    <Stack.Navigator initialRouteName="pluginListBuy" screenOptions={defaultScreenOptions}>
+      <Stack.Screen name="pluginListBuy" component={GuiPluginListScene} options={firstSceneScreenOptions} />
+      <Stack.Screen
+        name="pluginViewBuy"
+        component={GuiPluginViewScene}
+        options={{
+          headerTitle: () => <ParamHeaderTitle<'pluginViewBuy'> fromParams={params => params.plugin.displayName} />,
+          headerRight: () => <HeaderTextButton type="exit" />,
+          headerLeft: () => <PluginBackButton />
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginAddressForm"
+        component={AddressFormScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginEnterAmount"
+        component={FiatPluginEnterAmountScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginInfoDisplay"
+        component={InfoDisplayScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginSepaForm"
+        component={SepaFormScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen name="guiPluginWebView" component={FiatPluginWebViewComponent} />
+      <Stack.Screen name="rewardsCardDashboard" component={RewardsCardDashboardScene} />
+      <Stack.Screen name="rewardsCardWelcome" component={RewardsCardWelcomeScene} />
+    </Stack.Navigator>
+  )
+}
 
-    // Temporarily disable showing toast since we are getting the back event
-    // on almost every login. This is a temporary fix until we can figure it out
-    // For now just log the event
-    console.warn('Warning: Back button pressed to exit app. Toast supressed.')
-    // Airship.show(bridge => <AirshipToast bridge={bridge} message={lstrings.back_button_tap_again_to_exit} />)
-    //   .then(() => {
-    //     backPressedOnce.current = false
-    //   })
-    //   .catch(err => showError(err))
-    // // Timeout the back press after 3 seconds so the state isn't "sticky"
-    // setTimeout(() => {
-    //   backPressedOnce.current = false
-    // }, 3000)
-    return false
-  })
+const EdgeSellTabScreen = () => {
+  return (
+    <Stack.Navigator initialRouteName="pluginListSell" screenOptions={defaultScreenOptions}>
+      <Stack.Screen name="pluginListSell" component={GuiPluginListScene} options={firstSceneScreenOptions} />
+      <Stack.Screen
+        name="pluginViewSell"
+        component={GuiPluginViewScene}
+        options={{
+          headerTitle: () => <ParamHeaderTitle<'pluginViewSell'> fromParams={params => params.plugin.displayName} />,
+          headerRight: () => <HeaderTextButton type="exit" />,
+          headerLeft: () => <PluginBackButton />
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginAddressForm"
+        component={AddressFormScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginEnterAmount"
+        component={FiatPluginEnterAmountScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginInfoDisplay"
+        component={InfoDisplayScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen
+        name="guiPluginSepaForm"
+        component={SepaFormScene}
+        options={{
+          headerRight: () => null
+        }}
+      />
+      <Stack.Screen name="guiPluginWebView" component={FiatPluginWebViewComponent} />
+      <Stack.Screen name="rewardsCardDashboard" component={RewardsCardDashboardScene} />
+      <Stack.Screen name="rewardsCardWelcome" component={RewardsCardWelcomeScene} />
+    </Stack.Navigator>
+  )
+}
+
+const EdgeSwapTabScreen = () => {
+  return (
+    <Stack.Navigator initialRouteName="swapCreate" screenOptions={defaultScreenOptions}>
+      <Stack.Screen
+        name="swapCreate"
+        component={SwapCreateScene}
+        options={{
+          ...firstSceneScreenOptions,
+          title: lstrings.title_exchange
+        }}
+      />
+      <Stack.Screen name="swapConfirmation" component={SwapConfirmationScene} />
+      <Stack.Screen
+        name="swapProcessing"
+        component={SwapProcessingScene}
+        options={{
+          headerLeft: () => null,
+          headerRight: () => null
+        }}
+      />
+    </Stack.Navigator>
+  )
+}
+
+const EdgeTabs = () => {
+  const { defaultScreen } = getDeviceSettings()
+  const initialRouteName = defaultScreen === 'assets' ? 'walletsTab' : 'homeTab'
 
   return (
-    <Drawer.Navigator
-      drawerContent={props => SideMenu(props)}
-      initialRouteName="edgeAppStack"
+    <Tab.Navigator
+      initialRouteName={initialRouteName}
+      tabBar={props => <MenuTabs {...props} />}
       screenOptions={{
-        drawerPosition: 'right',
-        drawerType: 'front',
-        drawerStyle: { backgroundColor: 'transparent', bottom: 0, width: '66%' },
         headerShown: false
       }}
     >
-      <Drawer.Screen name="edgeAppStack" component={EdgeAppStack} />
-    </Drawer.Navigator>
+      <Tab.Screen name="homeTab" component={EdgeHomeTabScreen} />
+      <Tab.Screen name="walletsTab" component={EdgeWalletsTabScreen} />
+      <Tab.Screen name="buyTab" component={EdgeBuyTabScreen} />
+      <Tab.Screen name="sellTab" component={EdgeSellTabScreen} />
+      <Tab.Screen name="swapTab" component={EdgeSwapTabScreen} />
+      <Tab.Screen name="extraTab" component={ExtraTabScene} />
+      <Tab.Screen name="devTab" component={DevTestScene} />
+    </Tab.Navigator>
   )
 }
 
-const EdgeAppStack = () => {
-  const dispatch = useDispatch()
+// -------------------------------------------------------------------------
+// Main `edgeAppStack`
+// The tabs live inside this stack, as well as most app scenes.
+// -------------------------------------------------------------------------
 
+const EdgeAppStack = () => {
   return (
     <Stack.Navigator initialRouteName="edgeTabs" screenOptions={defaultScreenOptions}>
       <Stack.Screen
@@ -381,13 +445,7 @@ const EdgeAppStack = () => {
           headerRight: () => null
         }}
       />
-      <Stack.Screen
-        name="coinRanking"
-        component={CoinRankingScene}
-        listeners={{
-          focus: () => dispatch(checkEnabledExchanges())
-        }}
-      />
+      <Stack.Screen name="coinRanking" component={CoinRankingScene} />
       <Stack.Screen name="coinRankingDetails" component={CoinRankingDetailsScene} />
       <Stack.Screen name="confirmScene" component={ConfirmScene} />
       <Stack.Screen
@@ -561,27 +619,6 @@ const EdgeAppStack = () => {
       />
       <Stack.Screen name="fioStakingChange" component={FioStakingChangeScene} />
       <Stack.Screen name="fioStakingOverview" component={FioStakingOverviewScene} />
-      <Stack.Screen
-        name="guiPluginAddressForm"
-        component={AddressFormScene}
-        options={{
-          headerRight: () => null
-        }}
-      />
-      <Stack.Screen
-        name="guiPluginSepaForm"
-        component={SepaFormScene}
-        options={{
-          headerRight: () => null
-        }}
-      />
-      <Stack.Screen
-        name="guiPluginInfoDisplay"
-        component={InfoDisplayScene}
-        options={{
-          headerRight: () => null
-        }}
-      />
       <Stack.Screen name="loanClose" component={LoanCloseScene} />
       <Stack.Screen name="loanCreate" component={LoanCreateScene} />
       <Stack.Screen name="loanCreateConfirmation" component={LoanCreateConfirmationScene} />
@@ -597,6 +634,17 @@ const EdgeAppStack = () => {
         }}
       />
 
+      <Stack.Screen name="sweepPrivateKeyProcessing" component={SweepPrivateKeyProcessingScene} />
+      <Stack.Screen name="sweepPrivateKeySelectCrypto" component={SweepPrivateKeySelectCryptoScene} />
+      <Stack.Screen name="sweepPrivateKeyCalculateFee" component={SweepPrivateKeyCalculateFeeScene} />
+      <Stack.Screen
+        name="sweepPrivateKeyCompletion"
+        component={SweepPrivateKeyCompletionScene}
+        options={{
+          headerLeft: () => null,
+          headerRight: () => null
+        }}
+      />
       <Stack.Screen name="migrateWalletCalculateFee" component={MigrateWalletCalculateFeeScene} />
       <Stack.Screen
         name="migrateWalletCompletion"
@@ -665,11 +713,6 @@ const EdgeAppStack = () => {
         options={{
           title: lstrings.title_settings
         }}
-        listeners={{
-          focus: () => {
-            dispatch(showReEnableOtpModal()).catch(err => showError(err))
-          }
-        }}
       />
       <Stack.Screen
         name="spendingLimits"
@@ -711,127 +754,94 @@ const EdgeAppStack = () => {
   )
 }
 
-const EdgeTabs = () => {
-  const { defaultScreen } = getDeviceSettings()
-  const initialRouteName = defaultScreen === 'assets' ? 'walletsTab' : 'homeTab'
+// -------------------------------------------------------------------------
+// Root router
+// -------------------------------------------------------------------------
 
+const EdgeApp = () => {
   return (
-    <Tab.Navigator
-      initialRouteName={initialRouteName}
-      tabBar={props => <MenuTabs {...props} />}
+    <Drawer.Navigator
+      drawerContent={props => SideMenu(props)}
+      initialRouteName="edgeAppStack"
       screenOptions={{
+        drawerPosition: 'right',
+        drawerType: 'front',
+        drawerStyle: { backgroundColor: 'transparent', bottom: 0, width: '66%' },
         headerShown: false
       }}
     >
-      <Tab.Screen name="homeTab" component={EdgeHomeTabScreen} />
-      <Tab.Screen name="walletsTab" component={EdgeWalletsTabScreen} />
-      <Tab.Screen name="buyTab" component={EdgeBuyTabScreen} />
-      <Tab.Screen name="sellTab" component={EdgeSellTabScreen} />
-      <Tab.Screen name="swapTab" component={EdgeSwapTabScreen} />
-      <Tab.Screen name="extraTab" component={ExtraTabScene} />
-      <Tab.Screen name="devTab" component={DevTestScene} />
-    </Tab.Navigator>
+      <Drawer.Screen name="edgeAppStack" component={EdgeAppStack} />
+    </Drawer.Navigator>
   )
 }
 
-const EdgeHomeTabScreen = () => {
-  return (
-    <Stack.Navigator initialRouteName="home" screenOptions={defaultScreenOptions}>
-      <Stack.Screen name="home" component={HomeSceneUi4} options={firstSceneScreenOptions} />
-    </Stack.Navigator>
-  )
-}
-
-const EdgeWalletsTabScreen = () => {
-  return (
-    <Stack.Navigator initialRouteName="walletList" screenOptions={defaultScreenOptions}>
-      <Stack.Screen
-        name="transactionDetails"
-        component={TransactionDetailsScene}
-        options={{
-          headerTitle: () => <TransactionDetailsTitle />
-        }}
-      />
-      <Stack.Screen name="walletList" component={WalletListScene} options={firstSceneScreenOptions} />
-      <Stack.Screen
-        name="transactionList"
-        component={TransactionList}
-        options={{ headerTitle: () => <ParamHeaderTitle<'transactionList'> fromParams={params => params.walletName} /> }}
-      />
-    </Stack.Navigator>
-  )
-}
-
-const EdgeBuyTabScreen = () => {
-  return (
-    <Stack.Navigator initialRouteName="pluginListBuy" screenOptions={defaultScreenOptions}>
-      <Stack.Screen
-        name="guiPluginEnterAmount"
-        component={FiatPluginEnterAmountScene}
-        options={{
-          headerRight: () => null
-        }}
-      />
-      <Stack.Screen name="pluginListBuy" component={GuiPluginListScene} options={firstSceneScreenOptions} />
-      <Stack.Screen name="guiPluginWebView" component={FiatPluginWebViewComponent} />
-      <Stack.Screen
-        name="pluginViewBuy"
-        component={GuiPluginViewScene}
-        options={{
-          headerTitle: () => <ParamHeaderTitle<'pluginViewBuy'> fromParams={params => params.plugin.displayName} />,
-          headerRight: () => <HeaderTextButton type="exit" />,
-          headerLeft: () => <PluginBackButton />
-        }}
-      />
-    </Stack.Navigator>
-  )
-}
-
-const EdgeSellTabScreen = () => {
-  return (
-    <Stack.Navigator initialRouteName="pluginListSell" screenOptions={defaultScreenOptions}>
-      <Stack.Screen name="guiPluginEnterAmount" component={FiatPluginEnterAmountScene} />
-      <Stack.Screen name="pluginListSell" component={GuiPluginListScene} options={firstSceneScreenOptions} />
-      <Stack.Screen name="guiPluginWebView" component={FiatPluginWebViewComponent} />
-      <Stack.Screen name="rewardsCardDashboard" component={RewardsCardDashboardScene} />
-      <Stack.Screen name="rewardsCardWelcome" component={RewardsCardWelcomeScene} />
-      <Stack.Screen
-        name="pluginViewSell"
-        component={GuiPluginViewScene}
-        options={{
-          headerTitle: () => <ParamHeaderTitle<'pluginViewSell'> fromParams={params => params.plugin.displayName} />,
-          headerRight: () => <HeaderTextButton type="exit" />,
-          headerLeft: () => <PluginBackButton />
-        }}
-      />
-    </Stack.Navigator>
-  )
-}
-
-const EdgeSwapTabScreen = () => {
+export const Main = () => {
+  const theme = useTheme()
   const dispatch = useDispatch()
+
+  // TODO: Create a new provider instead to serve the experimentConfig globally
+  const [experimentConfig, setExperimentConfig] = React.useState<ExperimentConfig | undefined>(isMaestro() ? DEFAULT_EXPERIMENT_CONFIG : undefined)
+
+  const [hasInitialScenesLoaded, setHasInitialScenesLoaded] = React.useState(false)
+
+  // Match react navigation theme background with the patina theme
+  const reactNavigationTheme = React.useMemo(() => {
+    return {
+      ...DefaultTheme,
+      colors: {
+        ...DefaultTheme.colors,
+        background: theme.backgroundGradientColors[0]
+      }
+    }
+  }, [theme])
+
+  const context = useSelector(state => state.core.context)
+  const { localUsers } = context
+
+  useMount(() => {
+    dispatch(logEvent('Start_App', { numAccounts: localUsers.length }))
+    if (localUsers.length === 0) {
+      dispatch(logEvent('Start_App_No_Accounts'))
+    } else {
+      dispatch(logEvent('Start_App_With_Accounts'))
+    }
+
+    // Used to re-enable animations to login scene:
+    setTimeout(() => {
+      setHasInitialScenesLoaded(true)
+    }, 0)
+  })
+
+  // Wait for the experiment config to initialize before rendering anything
+  useAsyncEffect(
+    async () => {
+      if (isMaestro()) return
+      setExperimentConfig(await getExperimentConfig())
+    },
+    [],
+    'setLegacyLanding'
+  )
+
+  const initialRouteName = ENV.USE_WELCOME_SCREENS && localUsers.length === 0 ? 'gettingStarted' : 'login'
+
   return (
-    <Stack.Navigator initialRouteName="swapCreate" screenOptions={defaultScreenOptions}>
-      <Stack.Screen
-        name="swapCreate"
-        component={SwapCreateScene}
-        options={{
-          ...firstSceneScreenOptions,
-          title: lstrings.title_exchange
-        }}
-        listeners={{
-          focus: () => dispatch(checkEnabledExchanges())
-        }}
-      />
-      <Stack.Screen name="swapConfirmation" component={SwapConfirmationScene} />
-      <Stack.Screen
-        name="swapProcessing"
-        component={SwapProcessingScene}
-        options={{
-          headerLeft: () => null,
-          headerRight: () => null
-        }}
-      />
-    </Stack.Navigator>
+    <>
+      {experimentConfig == null ? (
+        <LoadingSplashScreen />
+      ) : (
+        <NavigationContainer theme={reactNavigationTheme}>
+          <Stack.Navigator
+            initialRouteName={initialRouteName}
+            screenOptions={{
+              headerShown: false
+            }}
+          >
+            <Stack.Screen name="edgeApp" component={EdgeApp} />
+            <Stack.Screen name="gettingStarted" component={GettingStartedScene} initialParams={{ experimentConfig }} />
+            <Stack.Screen name="login" component={LoginScene} initialParams={{ experimentConfig }} options={{ animationEnabled: hasInitialScenesLoaded }} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      )}
+    </>
   )
 }

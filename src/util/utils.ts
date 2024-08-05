@@ -234,6 +234,7 @@ export function precisionAdjust(params: PrecisionAdjustParams): number {
   const exchangeSecondaryToPrimaryRatio = parseFloat(params.exchangeSecondaryToPrimaryRatio)
   const order = Math.floor(Math.log(exchangeSecondaryToPrimaryRatio) / Math.LN10 + 0.000000001) // because float math sucks like that
   const exchangeRateOrderOfMagnitude = Math.pow(10, order)
+  if (isNaN(exchangeRateOrderOfMagnitude)) return 0
 
   // Get the exchange rate in tenth of pennies
   const exchangeRateString = mul(exchangeRateOrderOfMagnitude.toString(), mul(params.secondaryExchangeMultiplier, '10'))
@@ -577,9 +578,9 @@ export async function fuzzyTimeout<T>(promises: Array<Promise<T>>, timeoutMs: nu
 export const formatLargeNumberString = (num: number): string => {
   const absNum = Math.abs(num)
   if (absNum >= 1000000000) {
-    return (num / 1000000000).toFixed(1) + ' Bn'
+    return (num / 1000000000).toFixed(2) + ' Bn'
   } else if (absNum >= 1000000) {
-    return (num / 1000000).toFixed(1) + ' M'
+    return (num / 1000000).toFixed(2) + ' M'
   } else {
     return num.toString()
   }

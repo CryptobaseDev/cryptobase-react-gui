@@ -2,7 +2,46 @@
 
 ## Unreleased
 
-## 4.9.0
+- added: Kado buy via wire transfer
+- changed: Use partners API to determine US state support for Mooopay, Simplex, and Banxa
+- changed: Conditionalize use of Paybis promoCodes for new users <$1k purchases
+
+## 4.10.0
+
+- added: Network names to wallet list cards
+- added: 0x Gasless Swap exchange plugin
+- added: Add Solana on Banxa and Moonpay
+- added: Add Mt Pelerin support for buy and sell with reverse (dest amount) quotes
+- changed: InsufficientFeesModal shows the network name for ETH fees not on Ethereum (e.g. Optimism)
+- changed: Save last used Home/Assets scene and use as default. Remove settings option
+- changed: Replace native `Alert` with `showToast` and `ButtonsModal`
+- changed: Show common chain icon as primary for L2 chains
+- changed: Use new `FioService` to manage expired domains and `fioWallets` redux value
+- changed: Update generic stake plugins to use info server rollup for APY values
+- changed: Ui4 components renamed and reorganized
+- changed: SendScene "Fee:" renamed to "Network Fee:"
+- changed: Style of "Already have an account? Sign in" tappable text
+- changed: EdgeRow shrinks content by default
+- changed: Improved fetch logic for Markets scene
+- changed: Light account backup notification message changed to "Guest Account - Tap to create username and password"
+- fixed: Light accounts erroneously showing IP validation warning
+- fixed: Android keyboard enter key to support newlines in multiline text inputs
+- fixed: Broken link in "Help Closing App"
+- fixed: Incorrect best quote picking for sell plugins
+- fixed: Buying non-BTC assets with Bity
+
+## 4.9.2 (2024-07-22)
+
+- fixed: Set avoidNativeFee on Rango to fix bridge failures
+
+## 4.9.1 (2024-07-21)
+
+- changed: Velodrome staking plugin will ignore LP token balance and use entered amounts for `addLiquidity` methods
+- changed: Velodrome staking plugin will skip `deposit` method on disabled contracts
+- fixed: Possible to get stuck on account creation flow with specific navigation steps
+- fixed: Incorrect `startNativeAmount` passed to flip input modal for staking policies with multiple stake assets
+
+## 4.9.0 (2024-07-18)
 
 - added: Support for Universal and App Links
 - added: A post-install survey asking users how they discovered the app
@@ -11,11 +50,12 @@
 - added: Allow promoCards to send promoCodes to fiat partners for special pricing
 - added: Allow promoCard URLs to specify a currency pluginId to have replaced with a public address
 - added: Rango Exchange DEX aggregator support
-- added: A spinner next to the total balance to indicate syncing
 - changed: Prefer DEX estimate quotes over CEX fixed rate quotes if the DEX quote has a better rate
 - changed: Light account backup notification card now persists no matter what while logged in to a light account
 - changed: Replaced 'react-native-camera' with 'react-native-vision-camera'
 - changed: WalletConnect: Move initial wallet selection to connections list scene
+- changed: Disable Sentry automatic breadcrumbs
+- fixed: Bring back the "Please tap BACK again to log out" toast
 - fixed: Fix for negative total balance due to small numbers and scientific notation
 - fixed: Stabilize the account sync bar progress motion.
 - fixed: Update Algorand's WalletConnectv2 reference
@@ -25,13 +65,14 @@
 - fixed: Possible for keyboard to cover input fields in some Android WebViews
 - fixed: Call the correct method when rejecting a WalletConnect session
 - fixed: "Exchange Rates Loading..." not showing in the balance card
+- fixed: Incorrect values in Markets scenes when certain non-USD fiats selected in settings - unsupported fiats will default to USD Market data
 - removed: Wallet-specific fiat currency setting. Account-wide fiat currency setting is now used for app-wide fiat calculation and display
 
-## 4.8.1
+## 4.8.1 (2024-06-28)
 
 - fixed: Remove react-native-check-version to fix red error
 
-## 4.8.0
+## 4.8.0 (2024-06-24)
 
 - added: "IP Validation Protection Enabled" bottom notification card
 - added: useAsyncNavigation hook to prevent duplicate navigation calls

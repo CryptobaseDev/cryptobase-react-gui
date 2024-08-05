@@ -24,6 +24,7 @@ exports[`initialState 1`] = `
       "activeWalletIds": [],
       "currencyConfig": {},
       "currencyWallets": {},
+      "rootLoginId": "",
       "watch": [Function],
     },
     "context": {},
@@ -45,7 +46,6 @@ exports[`initialState 1`] = `
   "network": {
     "isConnected": true,
   },
-  "nextLoginId": null,
   "notificationSettings": {
     "ignoreMarketing": false,
     "ignorePriceChanges": false,
@@ -76,10 +76,6 @@ exports[`initialState 1`] = `
     },
     "fio": {
       "connectedWalletsByFioAddress": {},
-      "expireReminderShown": false,
-      "expiredChecking": false,
-      "expiredLastChecks": {},
-      "walletsCheckedForExpired": {},
     },
     "fioAddress": {
       "fioAddresses": [],

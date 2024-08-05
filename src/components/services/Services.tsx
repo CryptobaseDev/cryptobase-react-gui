@@ -3,20 +3,19 @@ import { EdgeAccount } from 'edge-core-js'
 import * as React from 'react'
 
 import { updateExchangeInfo } from '../../actions/ExchangeInfoActions'
+import { refreshConnectedWallets } from '../../actions/FioActions'
 import { refreshAllFioAddresses } from '../../actions/FioAddressActions'
 import { registerNotificationsV2 } from '../../actions/NotificationActions'
-import { checkCompromisedKeys, updateWalletsRequest } from '../../actions/WalletActions'
+import { checkCompromisedKeys } from '../../actions/WalletActions'
 import { ENV } from '../../env'
 import { useAsyncEffect } from '../../hooks/useAsyncEffect'
 import { useHandler } from '../../hooks/useHandler'
 import { useRefresher } from '../../hooks/useRefresher'
-import { makeStakePlugins } from '../../plugins/stake-plugins/stakePlugins'
 import { defaultAccount } from '../../reducers/CoreReducer'
 import { FooterAccordionEventService } from '../../state/SceneFooterState'
 import { useDispatch, useSelector } from '../../types/reactRedux'
 import { NavigationBase } from '../../types/routerTypes'
 import { height, ratioHorizontal, ratioVertical, width } from '../../util/scaling'
-import { updateAssetOverrides } from '../../util/serverState'
 import { snooze } from '../../util/utils'
 import { FioCreateHandleModal } from '../modals/FioCreateHandleModal'
 import { AccountCallbackManager } from './AccountCallbackManager'
@@ -26,6 +25,7 @@ import { AutoLogout } from './AutoLogout'
 import { ContactsLoader } from './ContactsLoader'
 import { DeepLinkingManager } from './DeepLinkingManager'
 import { EdgeContextCallbackManager } from './EdgeContextCallbackManager'
+import { FioService } from './FioService'
 import { LoanManagerService } from './LoanManagerService'
 import { NetworkActivity } from './NetworkActivity'
 import { PasswordReminderService } from './PasswordReminderService'
@@ -39,7 +39,7 @@ interface Props {
   navigation: NavigationBase
 }
 
-const REFRESH_INFO_SERVER_MS = 60000
+const REFRESH_INFO_SERVER_MS = 10 * 60 * 1000 // 10 minutes
 
 const FIO_CREATE_HANDLE_ITEM_ID = 'fioCreateHandleRecord'
 const asFioCreateHandleRecord = asJSON(
@@ -111,7 +111,7 @@ export function Services(props: Props) {
         console.warn('registerNotificationsV2 error:', e)
       })
 
-      await dispatch(updateWalletsRequest()).catch(err => console.warn(err))
+      await dispatch(refreshConnectedWallets).catch(err => console.warn(err))
       await dispatch(refreshAllFioAddresses()).catch(err => console.warn(err))
 
       // HACK: The balances object isn't full when the above promise resolves so we need to wait a few seconds before proceeding
@@ -127,8 +127,6 @@ export function Services(props: Props) {
   // Methods to call periodically
   useRefresher(
     async () => {
-      makeStakePlugins().catch(err => console.warn(err))
-      updateAssetOverrides().catch(err => console.warn(err))
       dispatch(updateExchangeInfo()).catch(err => console.warn(err))
     },
     undefined,
@@ -146,6 +144,7 @@ export function Services(props: Props) {
       {account == null ? null : <AccountCallbackManager account={account} navigation={navigation} />}
       {account == null ? null : <SortedWalletList account={account} />}
       <EdgeContextCallbackManager navigation={navigation} />
+      {account == null ? null : <FioService account={account} navigation={navigation} />}
       <PermissionsManager />
       {startLoanManager ? <LoanManagerService account={account} /> : null}
       <NetworkActivity />

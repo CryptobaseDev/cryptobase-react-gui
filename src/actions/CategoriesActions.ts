@@ -511,6 +511,7 @@ export const getTxActionDisplayInfo = (tx: EdgeTransaction, account: EdgeAccount
 }
 
 export const pluginIdIcons: Record<string, string> = {
+  '0xgasless': EDGE_CONTENT_SERVER_URI + '/0xgasless.png',
   bitrefill: EDGE_CONTENT_SERVER_URI + '/bitrefill.png',
   bitsofgold: EDGE_CONTENT_SERVER_URI + '/bits-of-gold-logo.png',
   changenow: EDGE_CONTENT_SERVER_URI + '/changenow.png',
@@ -520,6 +521,7 @@ export const pluginIdIcons: Record<string, string> = {
   godex: EDGE_CONTENT_SERVER_URI + '/godex.png',
   letsexchange: EDGE_CONTENT_SERVER_URI + '/letsexchange-logo.png',
   lifi: EDGE_CONTENT_SERVER_URI + '/lifi.png',
+  rango: EDGE_CONTENT_SERVER_URI + '/rango.png',
   sideshift: EDGE_CONTENT_SERVER_URI + '/sideshift-logo.png',
   simplex: EDGE_CONTENT_SERVER_URI + '/simplex.png',
   swapuz: EDGE_CONTENT_SERVER_URI + '/swapuz.png',

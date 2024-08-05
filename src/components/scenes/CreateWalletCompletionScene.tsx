@@ -13,9 +13,9 @@ import { lstrings } from '../../locales/strings'
 import { splitCreateWalletItems, WalletCreateItem } from '../../selectors/getCreateWalletList'
 import { useDispatch, useSelector } from '../../types/reactRedux'
 import { EdgeSceneProps } from '../../types/routerTypes'
-import { SceneButtons } from '../common/SceneButtons'
+import { SceneButtons } from '../buttons/SceneButtons'
 import { SceneWrapper } from '../common/SceneWrapper'
-import { IconDataRow } from '../data/row/IconDataRow'
+import { IconDataRow } from '../rows/IconDataRow'
 import { showError } from '../services/AirshipInstance'
 import { cacheStyles, Theme, useTheme } from '../services/ThemeContext'
 import { CreateWalletSelectCryptoRow } from '../themed/CreateWalletSelectCryptoRow'
@@ -73,18 +73,6 @@ const CreateWalletCompletionComponent = (props: Props) => {
   // Create the wallets and enable the tokens
   useAsyncEffect(
     async () => {
-      // Create tokens on existing wallets:
-      let tokenPromise: Promise<void> | undefined
-      if (tokenKey != null) {
-        tokenPromise = dispatch(enableTokensAcrossWallets(newTokenItems)).then(
-          () => setItemStatus(currentState => ({ ...currentState, [tokenKey]: 'complete' })),
-          error => {
-            showError(error)
-            setItemStatus(currentState => ({ ...currentState, [tokenKey]: 'error' }))
-          }
-        )
-      }
-
       // Create new wallets in parallel:
       const walletResults = await createWallets(
         account,
@@ -115,8 +103,15 @@ const CreateWalletCompletionComponent = (props: Props) => {
         }
       }
 
-      if (tokenPromise != null) {
-        await tokenPromise
+      // Create tokens on existing wallets:
+      if (tokenKey != null) {
+        await dispatch(enableTokensAcrossWallets(newTokenItems)).then(
+          () => setItemStatus(currentState => ({ ...currentState, [tokenKey]: 'complete' })),
+          error => {
+            showError(error)
+            setItemStatus(currentState => ({ ...currentState, [tokenKey]: 'error' }))
+          }
+        )
       }
 
       // Save the created wallets

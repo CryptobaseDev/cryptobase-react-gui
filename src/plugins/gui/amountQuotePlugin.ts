@@ -61,7 +61,7 @@ const MAX_QUOTE_VALUE = '10000000000'
 const NO_PROVIDER_TOAST_DURATION_MS = 10000
 
 export const amountQuoteFiatPlugin: FiatPluginFactory = async (params: FiatPluginFactoryArgs) => {
-  const { account, guiPlugin, longPress = false, showUi } = params
+  const { account, guiPlugin, longPress = false, pluginUtils, showUi } = params
   const { pluginId } = guiPlugin
   const isLightAccount = account.username == null
 
@@ -127,7 +127,7 @@ export const amountQuoteFiatPlugin: FiatPluginFactory = async (params: FiatPlugi
         throw new Error('Multiple paymentTypes not implemented')
       }
 
-      const paymentProviderPriority = providerPriority[paymentTypes[0]]
+      const paymentProviderPriority = providerPriority[paymentTypes[0]] ?? {}
       const priorityProviders = providers.filter(p => paymentProviderPriority[p.providerId] != null && paymentProviderPriority[p.providerId] > 0)
 
       if (priorityProviders.length === 0) {
@@ -379,6 +379,7 @@ export const amountQuoteFiatPlugin: FiatPluginFactory = async (params: FiatPlugi
             quoteParams = {
               pluginId: currencyPluginId,
               displayCurrencyCode: currencyCode,
+              pluginUtils,
               tokenId,
               exchangeAmount: value,
               fiatCurrencyCode,
@@ -394,6 +395,7 @@ export const amountQuoteFiatPlugin: FiatPluginFactory = async (params: FiatPlugi
             quoteParams = {
               pluginId: currencyPluginId,
               displayCurrencyCode: currencyCode,
+              pluginUtils,
               tokenId,
               exchangeAmount: value,
               fiatCurrencyCode,
@@ -435,7 +437,7 @@ export const amountQuoteFiatPlugin: FiatPluginFactory = async (params: FiatPlugi
           }
 
           // Find best quote factoring in pluginPriorities
-          bestQuote = getBestQuote(goodQuotes, priorityArray ?? [{}])
+          bestQuote = getBestQuote(direction, goodQuotes, priorityArray ?? [{}])
           if (bestQuote == null) {
             return { stateManagerUpdate: { statusText: { content: noQuoteText, textType: 'error' } } }
           }
@@ -557,13 +559,18 @@ export const createPriorityArray = (providerPriority: ProviderPriorityMap): Prio
   return priorityArray
 }
 
-export const getBestQuote = (quotes: FiatProviderQuote[], priorityArray: PriorityArray): FiatProviderQuote | undefined => {
+export const getBestQuote = (direction: 'buy' | 'sell', quotes: FiatProviderQuote[], priorityArray: PriorityArray): FiatProviderQuote | undefined => {
   let bestQuote
   let bestQuoteRatio = '0'
   for (const p of priorityArray) {
     for (const quote of quotes) {
       if (!p[quote.providerId]) continue
-      const quoteRatio = div(quote.cryptoAmount, quote.fiatAmount, 16)
+      let quoteRatio: string
+      if (direction === 'buy') {
+        quoteRatio = div(quote.cryptoAmount, quote.fiatAmount, 16)
+      } else {
+        quoteRatio = div(quote.fiatAmount, quote.cryptoAmount, 16)
+      }
 
       if (gt(quoteRatio, bestQuoteRatio)) {
         bestQuoteRatio = quoteRatio

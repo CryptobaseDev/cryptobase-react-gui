@@ -2,7 +2,6 @@ import { asArray, asBoolean, asMaybe, asNumber, asObject, asOptional, asString, 
 import { EdgeAccount, EdgeDenomination, EdgeSwapPluginType } from 'edge-core-js'
 import { disableTouchId, enableTouchId } from 'edge-login-ui-rn'
 import * as React from 'react'
-import { Alert } from 'react-native'
 
 import { ButtonsModal } from '../components/modals/ButtonsModal'
 import { asSortOption, SortOption } from '../components/modals/WalletListSortModal'
@@ -29,13 +28,21 @@ export function checkEnabledExchanges(): ThunkAction<void> {
     const exchanges = account.swapConfig
     if (exchanges == null) return
     for (const exchange of Object.keys(exchanges)) {
+      if (exchange === 'transfer') continue
       if (exchanges[exchange].enabled) {
         isAnyExchangeEnabled = true
       }
     }
 
     if (!isAnyExchangeEnabled) {
-      Alert.alert(lstrings.no_exchanges_available, lstrings.check_exchange_settings)
+      Airship.show<'ok' | undefined>(bridge => (
+        <ButtonsModal
+          bridge={bridge}
+          buttons={{ ok: { label: lstrings.string_ok_cap } }}
+          title={lstrings.no_exchanges_available}
+          message={lstrings.check_exchange_settings}
+        />
+      )).catch(() => {})
     }
   }
 }
@@ -208,32 +215,23 @@ export function togglePinLoginEnabled(pinLoginEnabled: boolean): ThunkAction<Pro
   }
 }
 
-export function showReEnableOtpModal(): ThunkAction<Promise<void>> {
-  return async (dispatch, getState) => {
-    const state = getState()
-    const { account } = state.core
-    const otpResetDate = account.otpResetDate
-    if (!otpResetDate) return
+export async function showReEnableOtpModal(account: EdgeAccount): Promise<void> {
+  const resolveValue = await Airship.show<'confirm' | 'cancel' | undefined>(bridge => (
+    <ButtonsModal
+      bridge={bridge}
+      title={lstrings.title_otp_keep_modal}
+      message={lstrings.otp_modal_reset_description}
+      buttons={{
+        confirm: { label: lstrings.otp_keep },
+        cancel: { label: lstrings.otp_disable }
+      }}
+    />
+  ))
 
-    const resolveValue = await Airship.show<'confirm' | 'cancel' | undefined>(bridge => (
-      <ButtonsModal
-        bridge={bridge}
-        title={lstrings.title_otp_keep_modal}
-        message={lstrings.otp_modal_reset_description}
-        buttons={{
-          confirm: { label: lstrings.otp_keep },
-          cancel: { label: lstrings.otp_disable }
-        }}
-      />
-    ))
-
-    if (resolveValue === 'confirm') {
-      // true on positive, false on negative
-      // let 2FA expire
-      await account.cancelOtpReset()
-    } else {
-      await account.disableOtp()
-    } // if default of null (press backdrop) do not change anything and keep reminding
+  if (resolveValue === 'confirm') {
+    await account.cancelOtpReset()
+  } else {
+    await account.disableOtp()
   }
 }
 
