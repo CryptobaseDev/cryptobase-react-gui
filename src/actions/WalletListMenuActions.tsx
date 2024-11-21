@@ -13,7 +13,7 @@ import { Paragraph } from '../components/themed/EdgeText'
 import { deleteLoanAccount } from '../controllers/loan-manager/redux/actions'
 import { lstrings } from '../locales/strings'
 import { ThunkAction } from '../types/reduxTypes'
-import { NavigationProp } from '../types/routerTypes'
+import { WalletsTabSceneProps } from '../types/routerTypes'
 import { getCurrencyCode } from '../util/CurrencyInfoHelpers'
 import { getWalletName } from '../util/CurrencyWalletHelpers'
 import { logActivity } from '../util/logger'
@@ -31,13 +31,14 @@ export type WalletListMenuKey =
   | 'getSeed'
   | 'manageTokens'
   | 'viewXPub'
+  | 'goToParent'
   | 'getRawKeys'
   | 'rawDelete'
   | 'togglePause'
   | string // for split keys like splitbitcoincash, splitethereum, etc.
 
 export function walletListMenuAction(
-  navigation: NavigationProp<'walletList'> | NavigationProp<'transactionList'>,
+  navigation: WalletsTabSceneProps<'walletList' | 'transactionList'>['navigation'],
   walletId: string,
   option: WalletListMenuKey,
   tokenId: EdgeTokenId,
@@ -144,6 +145,7 @@ export function walletListMenuAction(
     case 'split': {
       return async () => {
         navigation.navigate('createWalletSelectCrypto', {
+          disableLegacy: true,
           splitPluginIds,
           splitSourceWalletId: walletId
         })
@@ -277,6 +279,21 @@ export function walletListMenuAction(
           const keys = JSON.stringify(rawKeys, null, 2)
           await Airship.show(bridge => <RawTextModal bridge={bridge} body={keys} title={lstrings.string_raw_keys} disableCopy />)
         }
+      }
+    }
+
+    case 'goToParent': {
+      return async (dispatch, getState) => {
+        const state = getState()
+        const { account } = state.core
+        const { currencyWallets } = account
+        const wallet = currencyWallets[walletId]
+
+        navigation.navigate('transactionList', {
+          walletId,
+          tokenId: null,
+          walletName: getWalletName(wallet)
+        })
       }
     }
 

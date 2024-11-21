@@ -44,7 +44,10 @@ export class StakePoolFullError extends Error {
   }
 }
 
-export interface AssetId {
+/**
+ * Defines asset information within the context of staking, specifically.
+ */
+export interface StakeAssetInfo {
   pluginId: string
   currencyCode: string
   internalCurrencyCode?: string
@@ -76,15 +79,18 @@ export interface StakePolicy {
   yieldType?: 'stable' | 'variable'
 
   // The assets which can be earned
-  rewardAssets: AssetId[]
+  rewardAssets: StakeAssetInfo[]
 
   // Actions
   hideClaimAction?: boolean
   hideUnstakeAction?: boolean
   hideUnstakeAndClaimAction?: boolean
 
+  // Staking policy properties
+  isLiquidStaking?: boolean
+
   // The assets which must be staked
-  stakeAssets: AssetId[]
+  stakeAssets: StakeAssetInfo[]
 
   // Warnings
   // string => show string as warning
@@ -177,6 +183,7 @@ export interface StakePosition {
 // -----------------------------------------------------------------------------
 
 export interface StakePolicyFilter {
+  pluginId?: string
   wallet?: EdgeCurrencyWallet
   currencyCode?: string
 }
@@ -185,13 +192,16 @@ export const filterStakePolicies = (policies: StakePolicy[], filter?: StakePolic
   if (filter == null) return policies
 
   let out: StakePolicy[] = [...policies]
-  const { currencyCode, wallet } = filter
+  const { currencyCode, pluginId, wallet } = filter
 
   if (wallet != null) {
     out = out.filter(policy => [...policy.rewardAssets, ...policy.stakeAssets].some(asset => asset.pluginId === wallet.currencyInfo.pluginId))
   }
   if (currencyCode != null) {
     out = out.filter(policy => [...policy.rewardAssets, ...policy.stakeAssets].some(asset => asset.currencyCode === currencyCode))
+  }
+  if (pluginId != null) {
+    out = out.filter(policy => [...policy.rewardAssets, ...policy.stakeAssets].some(asset => asset.pluginId === pluginId))
   }
   return out
 }

@@ -1,5 +1,14 @@
 import { gt, gte } from 'biggystring'
-import { EdgeCurrencyWallet, EdgeSwapRequest, EdgeTokenId } from 'edge-core-js'
+import {
+  asMaybeInsufficientFundsError,
+  asMaybeSwapAboveLimitError,
+  asMaybeSwapBelowLimitError,
+  asMaybeSwapCurrencyError,
+  asMaybeSwapPermissionError,
+  EdgeCurrencyWallet,
+  EdgeSwapRequest,
+  EdgeTokenId
+} from 'edge-core-js'
 import * as React from 'react'
 import { useState } from 'react'
 import { Text, View } from 'react-native'
@@ -7,14 +16,13 @@ import { sprintf } from 'sprintf-js'
 
 import { DisableAsset } from '../../actions/ExchangeInfoActions'
 import { checkEnabledExchanges } from '../../actions/SettingsActions'
-import { updateMostRecentWalletsSelected } from '../../actions/WalletActions'
 import { getSpecialCurrencyInfo } from '../../constants/WalletAndCurrencyConstants'
 import { useSwapRequestOptions } from '../../hooks/swap/useSwapRequestOptions'
 import { useHandler } from '../../hooks/useHandler'
 import { useWatch } from '../../hooks/useWatch'
 import { lstrings } from '../../locales/strings'
 import { useDispatch, useSelector } from '../../types/reactRedux'
-import { EdgeSceneProps } from '../../types/routerTypes'
+import { NavigationBase, SwapTabSceneProps } from '../../types/routerTypes'
 import { getCurrencyCode } from '../../util/CurrencyInfoHelpers'
 import { getWalletName } from '../../util/CurrencyWalletHelpers'
 import { zeroString } from '../../util/utils'
@@ -27,11 +35,10 @@ import { SceneWrapper } from '../common/SceneWrapper'
 import { styled } from '../hoc/styled'
 import { SwapVerticalIcon } from '../icons/ThemedIcons'
 import { WalletListModal, WalletListResult } from '../modals/WalletListModal'
-import { Airship, showError, showToast, showWarning } from '../services/AirshipInstance'
+import { Airship, showToast, showWarning } from '../services/AirshipInstance'
 import { useTheme } from '../services/ThemeContext'
-import { ExchangedFlipInputAmounts, ExchangedFlipInputRef } from '../themed/ExchangedFlipInput2'
 import { LineTextDivider } from '../themed/LineTextDivider'
-import { SwapInput } from '../themed/SwapInput'
+import { SwapInput, SwapInputCardAmounts, SwapInputCardInputRef } from '../themed/SwapInput'
 import { ButtonBox } from '../themed/ThemedButtons'
 
 export interface SwapCreateParams {
@@ -48,21 +55,10 @@ export interface SwapCreateParams {
 export interface SwapErrorDisplayInfo {
   message: string
   title: string
+  error: unknown
 }
 
-interface Props extends EdgeSceneProps<'swapCreate'> {}
-
-interface State {
-  nativeAmount: string
-  fiatAmount: string
-  nativeAmountFor: 'from' | 'to'
-}
-
-const defaultState: State = {
-  nativeAmount: '0',
-  fiatAmount: '0',
-  nativeAmountFor: 'from'
-}
+interface Props extends SwapTabSceneProps<'swapCreate'> {}
 
 export const SwapCreateScene = (props: Props) => {
   const { navigation, route } = props
@@ -70,12 +66,13 @@ export const SwapCreateScene = (props: Props) => {
   const theme = useTheme()
   const dispatch = useDispatch()
 
-  const [state, setState] = useState({
-    ...defaultState
-  })
+  // Input state is the state of the user input
+  const [inputNativeAmount, setInputNativeAmount] = useState('0')
+  const [inputFiatAmount, setInputFiatAmount] = useState('0')
+  const [inputNativeAmountFor, setInputNativeAmountFor] = useState<'from' | 'to'>('from')
 
-  const fromInputRef = React.useRef<ExchangedFlipInputRef>(null)
-  const toInputRef = React.useRef<ExchangedFlipInputRef>(null)
+  const fromInputRef = React.useRef<SwapInputCardInputRef>(null)
+  const toInputRef = React.useRef<SwapInputCardInputRef>(null)
 
   const swapRequestOptions = useSwapRequestOptions()
 
@@ -104,7 +101,7 @@ export const SwapCreateScene = (props: Props) => {
     fromWallet == null ||
     toWallet == null ||
     // Don't show next button if the amount is zero:
-    zeroString(state.nativeAmount) ||
+    zeroString(inputNativeAmount) ||
     // Don't show next button if the amount exceeds the balance:
     checkAmountExceedsBalance()
 
@@ -121,6 +118,35 @@ export const SwapCreateScene = (props: Props) => {
   //
   // Callbacks
   //
+
+  /** Potentially clear an error if swap parameters relevant to the error have
+   * been user-modified. */
+  const getNewErrorInfo = (changed: 'amount' | 'asset'): { errorDisplayInfo?: SwapErrorDisplayInfo } => {
+    const { error } = errorDisplayInfo ?? {}
+    const isInsufficentFunds = asMaybeInsufficientFundsError(error) != null
+    const isSwapAboveLimit = asMaybeSwapAboveLimitError(error) != null
+    const isSwapBelowLimit = asMaybeSwapBelowLimitError(error) != null
+    const isSwapPermission = asMaybeSwapPermissionError(error) != null
+    const isSwapCurrency = asMaybeSwapCurrencyError(error) != null
+
+    let clearError = false
+
+    // Unknown error, clear it no matter what the user changes.
+    if (!(error instanceof Error) || error.name == null) {
+      clearError = true
+    }
+    // Amount related errors
+    else if (changed === 'amount' && (isInsufficentFunds || isSwapAboveLimit || isSwapBelowLimit)) {
+      clearError = true
+    }
+    // Selected asset related errors (arbitrarily includes all amount-related
+    // errors as well)
+    else if (changed === 'asset' && (isSwapPermission || isSwapCurrency || isInsufficentFunds || isSwapAboveLimit || isSwapBelowLimit)) {
+      clearError = true
+    }
+
+    return { errorDisplayInfo: clearError ? undefined : errorDisplayInfo }
+  }
 
   const checkDisableAsset = (disableAssets: DisableAsset[], walletId: string, tokenId: EdgeTokenId): boolean => {
     const wallet = currencyWallets[walletId] ?? { currencyInfo: {} }
@@ -141,25 +167,25 @@ export const SwapCreateScene = (props: Props) => {
     if (fromWallet == null) return false
     // We do not know what the from amount is if we are quoting "to" a
     // specific amount. Therefore we always return false in this case.
-    if (state.nativeAmountFor === 'to') return false
+    if (inputNativeAmountFor === 'to') return false
     // Get the balance:
     const fromWalletBalance = fromWalletBalanceMap.get(fromTokenId) ?? '0'
     // If there is a balance and the amount is greater than the balance,
     // return true (which means amount exceeded balance).
-    return gte(fromWalletBalance, '0') && gt(state.nativeAmount, fromWalletBalance)
+    return gte(fromWalletBalance, '0') && gt(inputNativeAmount, fromWalletBalance)
   }
 
   const getQuote = (swapRequest: EdgeSwapRequest) => {
     if (exchangeInfo != null) {
       const disableSrc = checkDisableAsset(exchangeInfo.swap.disableAssets.source, swapRequest.fromWallet.id, fromTokenId)
       if (disableSrc) {
-        showError(sprintf(lstrings.exchange_asset_unsupported, fromCurrencyCode))
+        showToast(sprintf(lstrings.swap_token_no_enabled_exchanges_2s, fromCurrencyCode, swapRequest.fromWallet.currencyInfo.displayName))
         return
       }
 
       const disableDest = checkDisableAsset(exchangeInfo.swap.disableAssets.destination, swapRequest.toWallet.id, toTokenId)
       if (disableDest) {
-        showError(sprintf(lstrings.exchange_asset_unsupported, toCurrencyCode))
+        showToast(sprintf(lstrings.swap_token_no_enabled_exchanges_2s, toCurrencyCode, swapRequest.toWallet.currencyInfo.displayName))
         return
       }
     }
@@ -187,14 +213,16 @@ export const SwapCreateScene = (props: Props) => {
   }
 
   const resetState = () => {
-    setState(defaultState)
+    setInputNativeAmount('0')
+    setInputFiatAmount('0')
+    setInputNativeAmountFor('from')
   }
 
   const showWalletListModal = async (whichWallet: 'from' | 'to') => {
     const result = await Airship.show<WalletListResult>(bridge => (
       <WalletListModal
         bridge={bridge}
-        navigation={props.navigation}
+        navigation={navigation as NavigationBase}
         headerTitle={whichWallet === 'to' ? lstrings.select_recv_wallet : lstrings.select_src_wallet}
         showCreateWallet={whichWallet === 'to'}
         allowKeysOnlyMode={whichWallet === 'from'}
@@ -218,23 +246,29 @@ export const SwapCreateScene = (props: Props) => {
       fromTokenId: toTokenId,
       toWalletId: fromWalletId,
       toTokenId: fromTokenId,
-      errorDisplayInfo
+      // Update the error state:
+      ...getNewErrorInfo('asset')
     })
-    const newNativeAmountFor = state.nativeAmountFor === 'from' ? 'to' : 'from'
+
     // Clear amount input state:
-    setState({
-      ...state,
-      nativeAmountFor: newNativeAmountFor
-    })
+    setInputNativeAmountFor(inputNativeAmountFor === 'from' ? 'to' : 'from')
+
     // Swap the amounts:
-    const toAmount = newNativeAmountFor === 'to' ? state.fiatAmount : '0'
-    const fromAmount = newNativeAmountFor === 'from' ? state.fiatAmount : '0'
-    toInputRef.current?.setAmount('fiat', toAmount)
-    fromInputRef.current?.setAmount('fiat', fromAmount)
+    // Use setTimeout to allow the component's state to change before making
+    // the imperative state changes.
+    setTimeout(() => {
+      if (inputNativeAmountFor === 'from') {
+        fromInputRef.current?.setAmount('fiat', '0')
+        toInputRef.current?.setAmount('fiat', inputFiatAmount)
+      } else {
+        toInputRef.current?.setAmount('fiat', '0')
+        fromInputRef.current?.setAmount('fiat', inputFiatAmount)
+      }
+    }, 0)
   })
 
   const handleSelectWallet = useHandler(async (walletId: string, tokenId: EdgeTokenId, direction: 'from' | 'to') => {
-    const params = {
+    navigation.setParams({
       ...route.params,
       ...(direction === 'to'
         ? {
@@ -244,10 +278,19 @@ export const SwapCreateScene = (props: Props) => {
         : {
             fromWalletId: walletId,
             fromTokenId: tokenId
-          })
+          }),
+      // Update the error state:
+      ...getNewErrorInfo('asset')
+    })
+
+    // Make sure to update the values if the wallet change is for the input
+    // field that has a native amount:
+    if (direction === 'from' && inputNativeAmountFor === 'from') {
+      fromInputRef.current?.triggerConvertValue()
     }
-    navigation.setParams(params)
-    dispatch(updateMostRecentWalletsSelected(walletId, tokenId))
+    if (direction === 'to' && inputNativeAmountFor === 'to') {
+      toInputRef.current?.triggerConvertValue()
+    }
   })
 
   const handleMaxPress = useHandler(() => {
@@ -279,7 +322,7 @@ export const SwapCreateScene = (props: Props) => {
     // Should only happen if the user initiated the swap from the keyboard
     if (fromWallet == null || toWallet == null) return
 
-    if (zeroString(state.nativeAmount)) {
+    if (zeroString(inputNativeAmount)) {
       showToast(`${lstrings.no_exchange_amount}. ${lstrings.select_exchange_amount}.`)
       return
     }
@@ -287,8 +330,8 @@ export const SwapCreateScene = (props: Props) => {
     const request: EdgeSwapRequest = {
       fromTokenId: fromTokenId,
       fromWallet: fromWallet,
-      nativeAmount: state.nativeAmount,
-      quoteFor: state.nativeAmountFor,
+      nativeAmount: inputNativeAmount,
+      quoteFor: inputNativeAmountFor,
       toTokenId: toTokenId,
       toWallet: toWallet
     }
@@ -306,24 +349,30 @@ export const SwapCreateScene = (props: Props) => {
     await showWalletListModal('to')
   })
 
-  const handleFromAmountChange = useHandler((amounts: ExchangedFlipInputAmounts) => {
-    setState({
-      ...state,
-      nativeAmount: amounts.nativeAmount,
-      fiatAmount: amounts.fiatAmount,
-      nativeAmountFor: 'from'
+  const handleFromAmountChange = useHandler((amounts: SwapInputCardAmounts) => {
+    navigation.setParams({
+      ...route.params,
+      // Update the error state:
+      ...getNewErrorInfo('amount')
     })
+
+    setInputNativeAmount(amounts.nativeAmount)
+    setInputFiatAmount(amounts.fiatAmount)
+    setInputNativeAmountFor('from')
     // Clear other input's amount:
     toInputRef.current?.setAmount('crypto', '0')
   })
 
-  const handleToAmountChange = useHandler((amounts: ExchangedFlipInputAmounts) => {
-    setState({
-      ...state,
-      nativeAmount: amounts.nativeAmount,
-      fiatAmount: amounts.fiatAmount,
-      nativeAmountFor: 'to'
+  const handleToAmountChange = useHandler((amounts: SwapInputCardAmounts) => {
+    navigation.setParams({
+      ...route.params,
+      // Update the error state:
+      ...getNewErrorInfo('amount')
     })
+
+    setInputNativeAmount(amounts.nativeAmount)
+    setInputFiatAmount(amounts.fiatAmount)
+    setInputNativeAmountFor('to')
     // Clear other input's amount:
     fromInputRef.current?.setAmount('crypto', '0')
   })

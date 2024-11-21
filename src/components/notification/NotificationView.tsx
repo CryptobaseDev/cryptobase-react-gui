@@ -146,8 +146,8 @@ const NotificationViewComponent = (props: Props) => {
       <EdgeAnim visible={isLightAccount} enter={fadeIn} exit={fadeOut}>
         <NotificationCard
           type="warning"
-          title={lstrings.guest_account}
-          message={lstrings.tap_to_create_username_password}
+          title={lstrings.backup_notification_title}
+          message={sprintf(lstrings.backup_notification_body, config.appName)}
           persistent
           onPress={handleBackupPress}
         />
@@ -193,7 +193,7 @@ const NotificationCardsContainer = styled(Animated.View)<{ hasTabs: boolean; ins
           paddingHorizontal: theme.rem(0.5),
           alignSelf: 'center',
           justifyContent: 'flex-end',
-          bottom: 0
+          bottom: theme.rem(0.5)
         },
         useAnimatedStyle(() => {
           const maybeMenuBarHeight = hasTabs ? interpolate(footerOpenRatio.value, [0, 1], [MIN_TAB_BAR_HEIGHT, MAX_TAB_BAR_HEIGHT]) : 0

@@ -2,35 +2,36 @@ import { EdgeLogType } from 'edge-core-js'
 import { getSupportedBiometryType } from 'edge-login-ui-rn'
 import * as React from 'react'
 import { Platform } from 'react-native'
+import { check } from 'react-native-permissions'
 import FontAwesomeIcon from 'react-native-vector-icons/FontAwesome'
 import IonIcon from 'react-native-vector-icons/Ionicons'
 import { sprintf } from 'sprintf-js'
 
 import { showBackupModal } from '../../actions/BackupModalActions'
 import { getDeviceSettings, writeDisableAnimations, writeForceLightAccountCreate } from '../../actions/DeviceSettingsActions'
-import { setContactsPermissionOn, setDeveloperModeOn, setSpamFilterOn } from '../../actions/LocalSettingsActions'
+import { setDeveloperModeOn, setSpamFilterOn } from '../../actions/LocalSettingsActions'
 import { showClearLogsModal, showSendLogsModal } from '../../actions/LogActions'
 import { logoutRequest } from '../../actions/LoginActions'
 import {
   setAutoLogoutTimeInSecondsRequest,
   showReEnableOtpModal,
-  showRestoreWalletsModal,
   showUnlockSettingsModal,
   togglePinLoginEnabled,
   updateTouchIdEnabled
 } from '../../actions/SettingsActions'
-import { CURRENCY_SETTINGS_KEYS } from '../../constants/WalletAndCurrencyConstants'
 import { ENV } from '../../env'
+import { useAsyncEffect } from '../../hooks/useAsyncEffect'
 import { useHandler } from '../../hooks/useHandler'
 import { useWatch } from '../../hooks/useWatch'
 import { lstrings } from '../../locales/strings'
+import { permissionNames } from '../../reducers/PermissionsReducer'
 import { getDefaultFiat } from '../../selectors/SettingsSelectors'
 import { config } from '../../theme/appConfig'
 import { useState } from '../../types/reactHooks'
 import { useDispatch, useSelector } from '../../types/reactRedux'
-import { EdgeSceneProps } from '../../types/routerTypes'
+import { EdgeAppSceneProps, NavigationBase } from '../../types/routerTypes'
 import { secondsToDisplay } from '../../util/displayTime'
-import { removeIsoPrefix } from '../../util/utils'
+import { getDisplayUsername, removeIsoPrefix } from '../../util/utils'
 import { ButtonsView } from '../buttons/ButtonsView'
 import { EdgeCard } from '../cards/EdgeCard'
 import { SceneWrapper } from '../common/SceneWrapper'
@@ -39,14 +40,15 @@ import { SectionView } from '../layout/SectionView'
 import { AutoLogoutModal } from '../modals/AutoLogoutModal'
 import { ConfirmContinueModal } from '../modals/ConfirmContinueModal'
 import { TextInputModal } from '../modals/TextInputModal'
-import { Airship, showError } from '../services/AirshipInstance'
+import { Airship, showDevError, showError } from '../services/AirshipInstance'
+import { requestContactsPermission } from '../services/PermissionsManager'
 import { changeTheme, useTheme } from '../services/ThemeContext'
 import { SettingsHeaderRow } from '../settings/SettingsHeaderRow'
 import { SettingsLabelRow } from '../settings/SettingsLabelRow'
 import { SettingsSwitchRow } from '../settings/SettingsSwitchRow'
 import { SettingsTappableRow } from '../settings/SettingsTappableRow'
 
-interface Props extends EdgeSceneProps<'settingsOverview'> {}
+interface Props extends EdgeAppSceneProps<'settingsOverview'> {}
 
 export const SettingsScene = (props: Props) => {
   const { navigation } = props
@@ -54,7 +56,6 @@ export const SettingsScene = (props: Props) => {
   const dispatch = useDispatch()
 
   const autoLogoutTimeInSeconds = useSelector(state => state.ui.settings.autoLogoutTimeInSeconds)
-  const contactsPermissionOn = useSelector(state => state.ui.settings.contactsPermissionOn)
   const defaultFiat = useSelector(state => getDefaultFiat(state))
   const developerModeOn = useSelector(state => state.ui.settings.developerModeOn)
   const isLocked = useSelector(state => state.ui.settings.changesLocked)
@@ -65,18 +66,23 @@ export const SettingsScene = (props: Props) => {
 
   const account = useSelector(state => state.core.account)
   const username = useWatch(account, 'username')
+  const allKeys = useWatch(account, 'allKeys')
+  const hasRestoreWallets = allKeys != null && allKeys.filter(key => key.archived || key.deleted).length > 0
 
   const context = useSelector(state => state.core.context)
   const logSettings = useWatch(context, 'logSettings')
+
+  const [localContactPermissionOn, setLocalContactsPermissionOn] = React.useState(false)
 
   const [isDarkTheme, setIsDarkTheme] = React.useState(theme === config.darkTheme)
   const [defaultLogLevel, setDefaultLogLevel] = React.useState<EdgeLogType | 'silent'>(logSettings.defaultLogLevel)
   const [disableAnim, setDisableAnim] = useState<boolean>(getDeviceSettings().disableAnimations)
   const [forceLightAccountCreate, setForceLightAccountCreate] = useState<boolean>(getDeviceSettings().forceLightAccountCreate)
-  const [touchIdText, setTouchIdText] = React.useState(lstrings.settings_button_use_touchID)
+  const [touchIdText, setTouchIdText] = React.useState<string>(lstrings.settings_button_use_touchID)
 
   const iconSize = theme.rem(1.25)
   const isLightAccount = username == null
+  const displayUsername = getDisplayUsername(account.rootLoginId, username)
 
   const autoLogout = secondsToDisplay(autoLogoutTimeInSeconds)
   const timeStrings = {
@@ -88,7 +94,7 @@ export const SettingsScene = (props: Props) => {
   const autoLogoutRightText = autoLogout.value === 0 ? lstrings.string_disable : `${autoLogout.value} ${timeStrings[autoLogout.measurement]}`
 
   const handleUpgrade = useHandler(() => {
-    showBackupModal({ navigation })
+    showBackupModal({ navigation: navigation as NavigationBase })
   })
 
   const handleUnlock = useHandler(() => {
@@ -133,11 +139,11 @@ export const SettingsScene = (props: Props) => {
   })
 
   const handleDefaultFiat = useHandler(() => {
-    navigation.navigate('defaultFiatSetting', {})
+    navigation.navigate('defaultFiatSetting')
   })
 
   const handleShowRestoreWalletsModal = useHandler(async () => {
-    await dispatch(showRestoreWalletsModal(navigation))
+    navigation.navigate('walletRestore')
   })
 
   const handleShowUnlockSettingsModal = useHandler(async () => {
@@ -155,19 +161,19 @@ export const SettingsScene = (props: Props) => {
   })
 
   const handleChangePassword = useHandler((): void => {
-    isLocked ? handleUnlock() : navigation.navigate('changePassword', {})
+    isLocked ? handleUnlock() : navigation.navigate('changePassword')
   })
 
   const handleChangePin = useHandler((): void => {
-    isLocked ? handleUnlock() : navigation.navigate('changePin', {})
+    isLocked ? handleUnlock() : navigation.navigate('changePin')
   })
 
   const handleChangeOtp = useHandler((): void => {
-    isLocked ? handleUnlock() : navigation.navigate('otpSetup', {})
+    isLocked ? handleUnlock() : navigation.navigate('otpSetup')
   })
 
   const handleChangeRecovery = useHandler((): void => {
-    isLocked ? handleUnlock() : navigation.navigate('passwordRecovery', {})
+    isLocked ? handleUnlock() : navigation.navigate('passwordRecovery')
   })
 
   const handleDeleteAccount = useHandler(async () => {
@@ -201,9 +207,9 @@ export const SettingsScene = (props: Props) => {
         onSubmit={async text => {
           if (text !== username) return lstrings.delete_account_verification_error
           await account.deleteRemoteAccount()
-          await dispatch(logoutRequest(navigation))
+          await dispatch(logoutRequest(navigation as NavigationBase))
           await context.forgetAccount(rootLoginId)
-          Airship.show(bridge => <TextDropdown bridge={bridge} message={sprintf(lstrings.delete_account_feedback, username)} />).catch(err => showError(err))
+          Airship.show(bridge => <TextDropdown bridge={bridge} message={sprintf(lstrings.delete_account_feedback, username)} />).catch(err => showDevError(err))
           return true
         }}
       />
@@ -211,11 +217,11 @@ export const SettingsScene = (props: Props) => {
   })
 
   const handleExchangeSettings = useHandler((): void => {
-    navigation.navigate('swapSettings', {})
+    navigation.navigate('swapSettings')
   })
 
   const handleSpendingLimits = useHandler((): void => {
-    navigation.navigate('spendingLimits', {})
+    navigation.navigate('spendingLimits')
   })
 
   const handleTermsOfService = useHandler(() => {
@@ -223,15 +229,15 @@ export const SettingsScene = (props: Props) => {
   })
 
   const handleToggleContactsPermission = useHandler(async () => {
-    await dispatch(setContactsPermissionOn(!contactsPermissionOn))
+    setLocalContactsPermissionOn(await requestContactsPermission(!localContactPermissionOn))
   })
 
   const handleNotificationSettings = useHandler(() => {
-    navigation.navigate('notificationSettings', {})
+    navigation.navigate('notificationSettings')
   })
 
   const handlePromotionSettings = useHandler(() => {
-    navigation.navigate('promotionSettings', {})
+    navigation.navigate('promotionSettings')
   })
 
   const handleToggleVerboseLogging = useHandler(() => {
@@ -273,6 +279,15 @@ export const SettingsScene = (props: Props) => {
     }
   }
 
+  useAsyncEffect(
+    async () => {
+      const currentContactsPermission = await check(permissionNames.contacts)
+      setLocalContactsPermissionOn(currentContactsPermission === 'granted')
+    },
+    [],
+    'SettingsScene'
+  )
+
   // Load biometry type on mount
   React.useEffect(() => {
     if (!supportsTouchId) return
@@ -305,7 +320,7 @@ export const SettingsScene = (props: Props) => {
         <>
           <SettingsHeaderRow
             icon={<FontAwesomeIcon color={theme.icon} name="user-o" size={iconSize} />}
-            label={`${lstrings.settings_account_title_cap}: ${username ?? lstrings.missing_username}`}
+            label={`${lstrings.settings_account_title_cap}: ${displayUsername}`}
           />
           {isLightAccount ? (
             <EdgeCard>
@@ -343,19 +358,20 @@ export const SettingsScene = (props: Props) => {
 
             <SettingsSwitchRow
               label={lstrings.settings_button_contacts_access_permission}
-              value={contactsPermissionOn}
+              value={localContactPermissionOn ?? false}
               onPress={handleToggleContactsPermission}
             />
             <SettingsSwitchRow key="spamFilter" label={lstrings.settings_hide_spam_transactions} value={spamFilterOn} onPress={handleToggleSpamFilter} />
             <SettingsTappableRow label={lstrings.settings_notifications} onPress={handleNotificationSettings} />
-            <SettingsTappableRow
-              label={lstrings.settings_asset_settings}
-              onPress={() => navigation.push('assetSettings', { currencySettingsKeys: CURRENCY_SETTINGS_KEYS })}
-            />
+            <SettingsTappableRow label={lstrings.settings_asset_settings} onPress={() => navigation.push('assetSettings')} />
             <SettingsTappableRow label={lstrings.title_promotion_settings} onPress={handlePromotionSettings} />
 
             <SettingsSwitchRow key="disableAnim" label={lstrings.button_disable_animations} value={disableAnim} onPress={handleToggleDisableAnimations} />
-            <SettingsTappableRow label={lstrings.restore_wallets_modal_title} onPress={handleShowRestoreWalletsModal} />
+            <SettingsTappableRow
+              label={lstrings.restore_wallets_modal_title}
+              onPress={hasRestoreWallets ? handleShowRestoreWalletsModal : undefined}
+              disabled={!hasRestoreWallets}
+            />
             <SettingsTappableRow label={lstrings.migrate_wallets_title} onPress={() => navigation.push('migrateWalletSelectCrypto', {})} />
             <SettingsTappableRow label={lstrings.title_terms_of_service} onPress={handleTermsOfService} />
             <SettingsSwitchRow

@@ -108,13 +108,14 @@ const SIMPLEX_ID_MAP: { [pluginId: string]: { [currencyCode: string]: string } }
   one: { ONE: 'ONE' },
   optimism: { ETH: 'ETH-OPTIMISM', OP: 'OP' },
   polkadot: { DOT: 'DOT' },
-  polygon: { GMEE: 'GMEE', MATIC: 'MATIC', USDC: 'USDC-MATIC' },
+  polygon: { GMEE: 'GMEE', POL: 'POL', USDC: 'USDC-MATIC' },
   qtum: { QTUM: 'QTUM' },
   ravencoin: { RVN: 'RVN' },
   ripple: { XRP: 'XRP' },
   solana: { KIN: 'KIN', SOL: 'SOL' },
   stellar: { XLM: 'XLM' },
   tezos: { XTZ: 'XTZ' },
+  ton: { TON: 'TON', USDT: 'USDT-TON' },
   tron: {
     BTT: 'BTT',
     KLV: 'KLV',
@@ -200,7 +201,7 @@ export const simplexProvider: FiatProviderFactory = {
       partnerIcon,
       pluginDisplayName,
       getSupportedAssets: async ({ direction, regionCode, paymentTypes }): Promise<FiatProviderAssetMap> => {
-        if (direction !== 'buy') {
+        if (direction !== 'buy' || regionCode.countryCode === 'GB') {
           throw new FiatProviderError({ providerId, errorType: 'paymentUnsupported' })
         }
 
@@ -294,11 +295,8 @@ export const simplexProvider: FiatProviderFactory = {
         console.log('Got Simplex quote')
         console.log(JSON.stringify(quote, null, 2))
 
-        // @ts-expect-error
-        if (quote.error != null) {
-          // @ts-expect-error
+        if ('error' in quote) {
           if (quote.type === 'invalidAmountLimit' || quote.type === 'amount_Limit_exceeded') {
-            // @ts-expect-error
             const result3 = quote.error.match(/The (.*) amount must be between (.*) and (.*)/)
             if (result3 == null || result3.length < 4) throw new Error('Simplex unknown error')
             const [fiatCode, minLimit, maxLimit] = result3.slice(1, 4)
@@ -309,6 +307,8 @@ export const simplexProvider: FiatProviderFactory = {
             if (lt(params.exchangeAmount, minLimit)) {
               throw new FiatProviderError({ providerId, errorType: 'underLimit', errorAmount: parseFloat(minLimit), displayCurrencyCode: fiatCode })
             }
+          } else if (quote.type === 'quote_error' && quote.error.includes('fees for this transaction exceed')) {
+            throw new FiatProviderError({ providerId, errorType: 'underLimit' })
           }
           throw new Error('Simplex unknown error')
         }

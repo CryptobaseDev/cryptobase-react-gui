@@ -34,6 +34,9 @@ interface BuildConfigFile {
   bundleId: string
 
   // Upload options:
+  zealotUrl?: string
+  zealotApiToken?: string
+  zealotChannelKey?: string
   appCenterApiToken: string
   appCenterAppName: string
   appCenterDistroGroup: string
@@ -55,7 +58,7 @@ interface BuildObj extends BuildConfigFile {
   guiDir: string
   guiPlatformDir: string
   platformType: string // 'android' | 'ios'
-  simBuild: boolean
+  maestroBuild: boolean
   repoBranch: string // 'develop' | 'master' | 'test'
   tmpDir: string
   buildArchivesDir: string
@@ -88,10 +91,11 @@ main()
 
 function main() {
   if (argv.length < 4) {
-    mylog('Usage: node -r sucrase/register deploy.ts [project] [platform] [branch]')
+    mylog('Usage: node -r sucrase/register deploy.ts [project] [platform] [branch] [test build]')
     mylog('  project options: edge')
-    mylog('  platform options: ios, android, ios-sim')
+    mylog('  platform options: ios, android')
     mylog('  branch options: master, develop')
+    mylog('  test build options (optional): maestro')
   }
 
   const buildObj: BuildObj = {} as any
@@ -102,8 +106,8 @@ function main() {
 
   // buildCommonPre()
   if (buildObj.platformType === 'ios') {
-    if (buildObj.simBuild) {
-      buildIosSim(buildObj)
+    if (buildObj.maestroBuild) {
+      buildIosMaestro(buildObj)
     } else {
       buildIos(buildObj)
     }
@@ -115,9 +119,9 @@ function main() {
 
 function makeCommonPre(argv: string[], buildObj: BuildObj) {
   buildObj.guiDir = _rootProjectDir
+  buildObj.maestroBuild = argv[5] === 'maestro'
   buildObj.repoBranch = argv[4] // master or develop
-  buildObj.platformType = argv[3] === 'ios-sim' ? 'ios' : argv[3] // ios or android
-  buildObj.simBuild = argv[3] === 'ios-sim'
+  buildObj.platformType = argv[3]
   buildObj.projectName = argv[2]
   buildObj.guiPlatformDir = buildObj.guiDir + buildObj.platformType
   buildObj.tmpDir = `${buildObj.guiDir}temp`
@@ -136,13 +140,20 @@ function makeProject(buildObj: BuildObj) {
 }
 
 function makeCommonPost(buildObj: BuildObj) {
+  const envJsonPath = buildObj.guiDir + '/env.json'
+  let envJson
+  if (fs.existsSync(envJsonPath)) {
+    envJson = JSON.parse(fs.readFileSync(envJsonPath, 'utf8'))
+  }
   if (buildObj.envJson != null) {
-    const envJsonPath = buildObj.guiDir + '/env.json'
-    let envJson = {}
-    if (fs.existsSync(envJsonPath)) {
-      envJson = JSON.parse(fs.readFileSync(envJsonPath, 'utf8'))
-    }
+    if (envJson == null) throw new Error('env.json file is missing')
     envJson = { ...envJson, ...buildObj.envJson[buildObj.repoBranch] }
+  }
+  if (buildObj.maestroBuild) {
+    if (envJson == null) throw new Error('env.json file is missing')
+    envJson = { ...envJson, ENABLE_MAESTRO_BUILD: true }
+  }
+  if (envJson != null) {
     fs.chmodSync(envJsonPath, 0o600)
     fs.writeFileSync(envJsonPath, JSON.stringify(envJson, null, 2))
   }
@@ -173,8 +184,6 @@ function buildIos(buildObj: BuildObj) {
   chdir(buildObj.guiDir)
   if (
     process.env.BUILD_REPO_URL &&
-    process.env.FASTLANE_USER != null &&
-    process.env.FASTLANE_PASSWORD != null &&
     // process.env.GITHUB_SSH_KEY != null &&
     process.env.HOME != null &&
     process.env.MATCH_KEYCHAIN_PASSWORD != null &&
@@ -191,13 +200,13 @@ function buildIos(buildObj: BuildObj) {
     const profileDir = join(process.env.HOME, 'Library', 'MobileDevice', 'Provisioning Profiles')
     call(`rm -rf ${escapePath(profileDir)}`)
     call(
-      `GIT_SSH_COMMAND="ssh -i ${githubSshKey}" fastlane match adhoc --git_branch="${buildObj.appleDeveloperTeamName}" -a ${buildObj.bundleId} --team_id ${buildObj.appleDeveloperTeamId}`
+      `GIT_SSH_COMMAND="ssh -i ${githubSshKey}" fastlane match adhoc --git_branch="${buildObj.appleDeveloperTeamName}" -a ${buildObj.bundleId} --team_id ${buildObj.appleDeveloperTeamId} --api_key_path fastlane.json`
     )
     call(
-      `GIT_SSH_COMMAND="ssh -i ${githubSshKey}" fastlane match development --git_branch="${buildObj.appleDeveloperTeamName}" -a ${buildObj.bundleId} --team_id ${buildObj.appleDeveloperTeamId}`
+      `GIT_SSH_COMMAND="ssh -i ${githubSshKey}" fastlane match development --git_branch="${buildObj.appleDeveloperTeamName}" -a ${buildObj.bundleId} --team_id ${buildObj.appleDeveloperTeamId} --api_key_path fastlane.json`
     )
     call(
-      `GIT_SSH_COMMAND="ssh -i ${githubSshKey}" fastlane match appstore --git_branch="${buildObj.appleDeveloperTeamName}" -a ${buildObj.bundleId} --team_id ${buildObj.appleDeveloperTeamId}`
+      `GIT_SSH_COMMAND="ssh -i ${githubSshKey}" fastlane match appstore --git_branch="${buildObj.appleDeveloperTeamName}" -a ${buildObj.bundleId} --team_id ${buildObj.appleDeveloperTeamId} --api_key_path fastlane.json`
     )
   } else {
     mylog('Missing or incomplete Fastlane params. Not using Fastlane')
@@ -292,7 +301,7 @@ function buildIos(buildObj: BuildObj) {
   buildObj.testRepoUrl = undefined
 }
 
-function buildIosSim(buildObj: BuildObj) {
+function buildIosMaestro(buildObj: BuildObj) {
   const { buildNum, guiDir, guiHash, guiPlatformDir, productName, productNameClean, repoBranch, tmpDir, xcodeScheme, xcodeWorkspace } = buildObj
 
   chdir(guiDir)
@@ -334,6 +343,7 @@ function buildAndroid(buildObj: BuildObj) {
     platformType,
     repoBranch,
     guiPlatformDir,
+    maestroBuild,
     bundleToolPath,
     androidKeyStore,
     androidKeyStoreAlias,
@@ -361,8 +371,10 @@ function buildAndroid(buildObj: BuildObj) {
   call('./gradlew signingReport')
   call(sprintf('./gradlew %s', buildObj.androidTask))
 
+  const testBuild = maestroBuild ? '-maestro' : ''
+
   // Process the AAB files created into APK format and place in archive directory
-  const outfile = `${buildObj.productNameClean}-${buildObj.repoBranch}-${buildObj.buildNum}`
+  const outfile = `${buildObj.productNameClean}-${buildObj.repoBranch}-${buildObj.buildNum}${testBuild}`
   const archiveDir = join(buildArchivesDir, repoBranch, platformType, String(buildNum))
   fs.mkdirSync(archiveDir, { recursive: true })
   const aabPath = join(archiveDir, `${outfile}.aab`)
@@ -381,11 +393,11 @@ function buildAndroid(buildObj: BuildObj) {
 }
 
 function buildCommonPost(buildObj: BuildObj) {
-  const { simBuild } = buildObj
+  const { maestroBuild, zealotApiToken, zealotChannelKey, zealotUrl } = buildObj
   let curl
   const notes = `${buildObj.productName} ${buildObj.version} (${buildObj.buildNum}) branch: ${buildObj.repoBranch} #${buildObj.guiHash}`
 
-  if (buildObj.hockeyAppToken && buildObj.hockeyAppId && !simBuild) {
+  if (buildObj.hockeyAppToken && buildObj.hockeyAppId && !maestroBuild) {
     mylog('\n\nUploading to HockeyApp')
     mylog('**********************\n')
     const url = sprintf('https://rink.hockeyapp.net/api/2/apps/%s/app_versions/upload', buildObj.hockeyAppId)
@@ -408,7 +420,7 @@ function buildCommonPost(buildObj: BuildObj) {
     mylog('\nUploaded to HockeyApp')
   }
 
-  if (buildObj.appCenterApiToken && buildObj.appCenterAppName && buildObj.appCenterGroupName && !simBuild) {
+  if (buildObj.appCenterApiToken && buildObj.appCenterAppName && buildObj.appCenterGroupName && !maestroBuild) {
     mylog('\n\nUploading to App Center')
     mylog('***********************\n')
 
@@ -420,6 +432,21 @@ function buildCommonPost(buildObj: BuildObj) {
     mylog('\n*** Upload to App Center Complete ***')
   }
 
+  if (zealotApiToken != null && zealotUrl != null && zealotChannelKey != null && !maestroBuild) {
+    const branch = encodeURIComponent(buildObj.repoBranch)
+    const gitCommit = encodeURIComponent(buildObj.guiHash)
+    chdir(buildObj.guiDir)
+    const changes = cmd(`git diff HEAD^ HEAD CHANGELOG.md | { grep '^+[^+]' || true; }`)
+    const changelog = encodeURIComponent(changes)
+    mylog(`\n\nUploading to Zealot: ${zealotUrl}`)
+    mylog('***********************************************************************\n')
+
+    call(
+      `curl -X POST "${zealotUrl}/api/apps/upload?token=${zealotApiToken}&channel_key=${zealotChannelKey}&branch=${branch}&git_commit=${gitCommit}&changelog=${changelog}" -F "file=@${buildObj.ipaFile}"`
+    )
+    mylog('\n*** Upload to Zealot Complete ***')
+  }
+
   if (buildObj.rsyncLocation != null) {
     const { buildNum, guiHash, platformType, productNameClean, repoBranch, testRepoUrl, version } = buildObj
 
@@ -428,7 +455,10 @@ function buildCommonPost(buildObj: BuildObj) {
 
     const datePrefix = new Date().toISOString().slice(2, 19).replace(/:/gi, '').replace(/-/gi, '')
     const [fileExtension] = buildObj.ipaFile.split('.').reverse()
-    const rsyncFile = escapePath(`${datePrefix}--${productNameClean}--${platformType}--${repoBranch}--${buildNum}--${guiHash.slice(0, 8)}.${fileExtension}`)
+    const testBuild = maestroBuild ? '--maestro' : ''
+    const rsyncFile = escapePath(
+      `${datePrefix}--${productNameClean}--${platformType}--${repoBranch}--${buildNum}--${guiHash.slice(0, 8)}${testBuild}.${fileExtension}`
+    )
 
     const rsyncFilePath = join(buildObj.rsyncLocation, rsyncFile)
     call(`rsync -avz -e "ssh -i ${githubSshKey}" ${buildObj.ipaFile} ${rsyncFilePath}`)

@@ -6,8 +6,8 @@ import { FIAT_CODES_SYMBOLS } from '../../../constants/WalletAndCurrencyConstant
 import { formatDate, formatNumber, SHORT_DATE_FMT } from '../../../locales/intl'
 import { lstrings } from '../../../locales/strings'
 import { connect } from '../../../types/reactRedux'
-import { EdgeSceneProps } from '../../../types/routerTypes'
-import { FioRequestStatus, GuiExchangeRates } from '../../../types/types'
+import { EdgeAppSceneProps } from '../../../types/routerTypes'
+import { FioRequest, FioRequestStatus, GuiExchangeRates } from '../../../types/types'
 import { EdgeCard } from '../../cards/EdgeCard'
 import { SceneWrapper } from '../../common/SceneWrapper'
 import { EdgeRow } from '../../rows/EdgeRow'
@@ -15,7 +15,11 @@ import { cacheStyles, Theme, ThemeProps, withTheme } from '../../services/ThemeC
 import { EdgeText } from '../../themed/EdgeText'
 import { SceneHeader } from '../../themed/SceneHeader'
 
-interface OwnProps extends EdgeSceneProps<'fioSentRequestDetails'> {}
+export interface FioSentRequestDetailsParams {
+  selectedFioSentRequest: FioRequest
+}
+
+interface OwnProps extends EdgeAppSceneProps<'fioSentRequestDetails'> {}
 
 interface StateProps {
   fiatSymbol: string

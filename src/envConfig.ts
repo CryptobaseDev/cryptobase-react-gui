@@ -1,5 +1,7 @@
 import { asArray, asBoolean, asEither, asNumber, asObject, asOptional, asString, asValue, Cleaner } from 'cleaners'
 
+import { asBase16 } from './util/cleaners/asHex'
+
 function asNullable<T>(cleaner: Cleaner<T>): Cleaner<T | null> {
   return function asNullable(raw) {
     if (raw == null) return null
@@ -18,6 +20,7 @@ const asEvmApiKeys = asObject({
   alethioApiKey: asOptional(asString, ''),
   amberdataApiKey: asOptional(asString, ''),
   blockchairApiKey: asOptional(asString, ''),
+  drpcApiKey: asOptional(asString, ''),
   evmScanApiKey: asOptional(asArray(asString), () => []),
   gasStationApiKey: asOptional(asString, ''),
   infuraProjectId: asOptional(asString, ''),
@@ -28,7 +31,9 @@ const asEvmApiKeys = asObject({
 
 export const asEnvConfig = asObject({
   // API keys:
-  AIRBITZ_API_KEY: asOptional(asString, ''),
+  EDGE_API_KEY: asOptional(asString, ''),
+  EDGE_API_SECRET: asOptional(asBase16),
+
   COINGECKO_API_KEY: asOptional(asString, 'a0000000000000000000000000000000'),
   IP_API_KEY: asOptional(asString, ''),
   SENTRY_DSN_URL: asOptional(asString, 'SENTRY_DSN_URL'),
@@ -114,21 +119,28 @@ export const asEnvConfig = asObject({
   ),
   AZTECO_API_KEY: asNullable(asString),
   STAKEKIT_API_KEY: asNullable(asString),
+  KILN_TESTNET_API_KEY: asNullable(asString),
+  KILN_TESTNET_ACCOUNT_ID: asNullable(asString),
+  KILN_MAINNET_API_KEY: asNullable(asString),
+  KILN_MAINNET_ACCOUNT_ID: asNullable(asString),
+  UNSTOPPABLE_DOMAINS_API_KEY: asNullable(asString),
 
   // Core plugin options:
   ARBITRUM_INIT: asCorePluginInit(asEvmApiKeys),
   AMOY_INIT: asCorePluginInit(asEvmApiKeys),
+  ALGORAND_INIT: asOptional(asBoolean, true),
   AVALANCHE_INIT: asCorePluginInit(asEvmApiKeys),
+  AXELAR_INIT: asOptional(asBoolean, true),
   BASE_INIT: asCorePluginInit(asEvmApiKeys),
   BINANCE_SMART_CHAIN_INIT: asCorePluginInit(asEvmApiKeys),
   BITCOIN_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   BITCOINCASH_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   CARDANO_INIT: asCorePluginInit(
@@ -145,6 +157,7 @@ export const asEnvConfig = asObject({
       maestroApiKey: asOptional(asString)
     })
   ),
+  CELO_INIT: asCorePluginInit(asEvmApiKeys),
   CHANGE_NOW_INIT: asCorePluginInit(
     asObject({
       apiKey: asOptional(asString, '')
@@ -156,19 +169,20 @@ export const asEnvConfig = asObject({
     }).withRest
   ),
   COREUM_INIT: asCorePluginInit(asBoolean),
+  COSMOSHUB_INIT: asCorePluginInit(asBoolean),
   DASH_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   DIGIBYTE_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   DOGE_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   ETHEREUM_INIT: asCorePluginInit(asEvmApiKeys),
@@ -188,6 +202,8 @@ export const asEnvConfig = asObject({
       freeRegRefCode: asOptional(asString, '')
     }).withRest
   ),
+  FILECOINFEVM_INIT: asCorePluginInit(asEvmApiKeys),
+  FILECOINFEVM_CALIBRATION_INIT: asCorePluginInit(asEvmApiKeys),
   FILECOIN_INIT: asCorePluginInit(
     asObject({
       glifApiKey: asOptional(asString, '')
@@ -195,7 +211,7 @@ export const asEnvConfig = asObject({
   ),
   GROESTLCOIN_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   GODEX_INIT: asCorePluginInit(
@@ -204,6 +220,8 @@ export const asEnvConfig = asObject({
     }).withRest
   ),
   HOLESKY_INIT: asCorePluginInit(asEvmApiKeys),
+  HEDERA_INIT: asOptional(asBoolean, true),
+  LIBERLAND_INIT: asOptional(asBoolean, true),
   LIFI_INIT: asCorePluginInit(
     asObject({
       affiliateFeeBasis: asOptional(asString, '50'),
@@ -213,7 +231,7 @@ export const asEnvConfig = asObject({
   ),
   LITECOIN_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   LETSEXCHANGE_INIT: asCorePluginInit(
@@ -229,7 +247,7 @@ export const asEnvConfig = asObject({
   OPTIMISM_INIT: asCorePluginInit(asEvmApiKeys),
   OSMOSIS_INIT: asCorePluginInit(asBoolean),
   PULSECHAIN_INIT: asCorePluginInit(asEvmApiKeys),
-
+  POLKADOT_INIT: asOptional(asBoolean, true),
   POLYGON_INIT: asCorePluginInit(asEvmApiKeys),
   RANGO_INIT: asCorePluginInit(
     asObject({
@@ -239,6 +257,7 @@ export const asEnvConfig = asObject({
       referrerFee: asOptional(asString, '0.75')
     }).withRest
   ),
+  RSK_INIT: asCorePluginInit(asEvmApiKeys),
   SEPOLIA_INIT: asCorePluginInit(asEvmApiKeys),
   SIDESHIFT_INIT: asCorePluginInit(
     asObject({
@@ -261,7 +280,22 @@ export const asEnvConfig = asObject({
       apiKey: asOptional(asString, '')
     }).withRest
   ),
+  MAYA_PROTOCOL_INIT: asCorePluginInit(
+    asObject({
+      affiliateFeeBasis: asOptional(asString, '50'),
+      appId: asOptional(asString, 'edge'),
+      thorname: asOptional(asString, 'ej')
+    }).withRest
+  ),
   THORCHAIN_INIT: asCorePluginInit(
+    asObject({
+      affiliateFeeBasis: asOptional(asString, '50'),
+      appId: asOptional(asString, 'edge'),
+      ninerealmsClientId: asOptional(asString, ''),
+      thorname: asOptional(asString, 'ej')
+    }).withRest
+  ),
+  SWAPKIT_INIT: asCorePluginInit(
     asObject({
       affiliateFeeBasis: asOptional(asString, '50'),
       appId: asOptional(asString, 'edge'),
@@ -287,12 +321,14 @@ export const asEnvConfig = asObject({
   ),
   ZCOIN_INIT: asCorePluginInit(
     asObject({
-      nowNodeApiKey: asOptional(asString, '')
+      nowNodesApiKey: asOptional(asString, '')
     })
   ),
   '0XGASLESS_INIT': asCorePluginInit(
     asObject({
-      apiKey: asOptional(asString, '')
+      apiKey: asOptional(asString, ''),
+      feePercentage: asOptional(asNumber, 0.0075),
+      feeReceiveAddress: asOptional(asString, '0xd75eB391357b89C48eb64Ea621A785FF9B77e661')
     })
   ),
   ZKSYNC_INIT: asCorePluginInit(asEvmApiKeys),
@@ -330,6 +366,7 @@ export const asEnvConfig = asObject({
   DEBUG_THEME: asOptional(asBoolean, false),
   MUTE_CONSOLE_OUTPUT: asOptional(asArray(asValue('log', 'info', 'warn', 'error', 'debug', 'trace', 'group', 'groupCollapsed', 'groupEnd')), []),
   ENABLE_FIAT_SANDBOX: asOptional(asBoolean, false),
+  ENABLE_MAESTRO_BUILD: asOptional(asBoolean, false),
   ENABLE_TEST_SERVERS: asOptional(asBoolean),
   ENABLE_REDUX_PERF_LOGGING: asOptional(asBoolean, false),
   LOG_SERVER: asNullable(

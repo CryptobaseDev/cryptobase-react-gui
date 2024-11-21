@@ -26,6 +26,11 @@ const SURVEY_OPTS = [
   { label: lstrings.survey_opt_in_person_event, selected: false },
   { label: lstrings.survey_opt_personal_referral, selected: false },
   { label: lstrings.survey_opt_article, selected: false },
+  { label: lstrings.survey_opt_BTCTKVR_magazine, selected: false },
+  // Show names intentionally left untranslated:
+  { label: 'Free Talk Live', selected: false },
+  { label: 'Crypto Canal', selected: false },
+  { label: 'Cris Cyborg', selected: false },
   { label: lstrings.survey_opt_other_specify, selected: false }
 ]
 
@@ -89,7 +94,20 @@ export const SurveyModal = (props: { bridge: AirshipBridge<void> }) => {
   }))
 
   return (
-    <EdgeModal bridge={bridge} onCancel={handleModalDismiss}>
+    <EdgeModal
+      bridge={bridge}
+      onCancel={handleModalDismiss}
+      title={
+        <View style={styles.titleContainer}>
+          <Paragraph center>
+            <HeaderText>{sprintf(lstrings.survey_discover_title_1s, config.appName)}</HeaderText>
+          </Paragraph>
+          <Paragraph center>
+            <SmallText>{lstrings.survey_discover_subtitle}</SmallText>
+          </Paragraph>
+        </View>
+      }
+    >
       {/** HACK: iOS and Android use extraScrollHeight differently... */}
       <KeyboardAwareScrollView
         extraScrollHeight={Platform.OS === 'ios' ? theme.rem(-16) : theme.rem(9)}
@@ -98,12 +116,6 @@ export const SurveyModal = (props: { bridge: AirshipBridge<void> }) => {
         keyboardShouldPersistTaps="handled"
         style={styles.containerStyle}
       >
-        <Paragraph center>
-          <HeaderText>{sprintf(lstrings.survey_discover_title_1s, config.appName)}</HeaderText>
-        </Paragraph>
-        <Paragraph center>
-          <SmallText>{lstrings.survey_discover_subtitle}</SmallText>
-        </Paragraph>
         <EdgeCard>
           <View style={styles.radioContainer}>
             {options.map((option, index) => (
@@ -135,6 +147,9 @@ export const SurveyModal = (props: { bridge: AirshipBridge<void> }) => {
 }
 
 const getStyles = cacheStyles((theme: Theme) => ({
+  titleContainer: {
+    flexDirection: 'column'
+  },
   radioContainer: {
     alignItems: 'flex-start'
   },

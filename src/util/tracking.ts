@@ -1,4 +1,4 @@
-import { captureException } from '@sentry/react-native'
+import { captureException, withScope } from '@sentry/react-native'
 import { TrackingEventName as LoginTrackingEventName, TrackingValues as LoginTrackingValues } from 'edge-login-ui-rn'
 import PostHog from 'posthog-react-native'
 import { getBuildNumber, getVersion } from 'react-native-device-info'
@@ -8,10 +8,12 @@ import { getFirstOpenInfo } from '../actions/FirstOpenActions'
 import { ENV } from '../env'
 import { ExperimentConfig, getExperimentConfig } from '../experimentConfig'
 import { ThunkAction } from '../types/reduxTypes'
+import { addMetadataToContext } from './addMetadataToContext'
 import { CryptoAmount } from './CryptoAmount'
 import { fetchReferral } from './network'
+import { AggregateErrorFix, normalizeError } from './normalizeError'
 import { makeErrorLog } from './translateError'
-import { consify } from './utils'
+import { consify, monthsBetween } from './utils'
 
 export type TrackingEventName =
   | 'Activate_Wallet_Cancel'
@@ -21,6 +23,7 @@ export type TrackingEventName =
   | 'Buy_Quote'
   | 'Buy_Quote_Change_Provider'
   | 'Buy_Quote_Next'
+  | 'Buy_Success'
   | 'Create_Wallet_Failed'
   | 'Create_Wallet_From_Search_Failed'
   | 'Create_Wallet_From_Search_Success'
@@ -94,6 +97,22 @@ export interface SellConversionValues {
 }
 
 /**
+ * Analytics: Buy from fiat
+ */
+export interface BuyConversionValues {
+  conversionType: 'buy'
+
+  // The quoted fiat amounts resulting from this sale
+  sourceFiatAmount: string
+  sourceFiatCurrencyCode: string
+
+  destAmount: CryptoAmount
+
+  fiatProviderId: string // Fiat provider that provided the conversion
+  orderId?: string // Unique order identifier provided by fiat provider
+}
+
+/**
  * Culmination of defined tracking value types, including those defined in
  * LoginUi.
  */
@@ -106,7 +125,7 @@ export interface TrackingValues extends LoginTrackingValues {
   surveyResponse?: string // User's answer to a survey
 
   // Conversion values
-  conversionValues?: DollarConversionValues | CryptoConversionValues | SellConversionValues
+  conversionValues?: DollarConversionValues | CryptoConversionValues | SellConversionValues | BuyConversionValues
 }
 
 // Set up the global Posthog analytics instance at boot
@@ -126,28 +145,41 @@ if (ENV.POSTHOG_INIT) {
 }
 
 /**
- * Track error to external reporting service (ie. Bugsnag)
+ * Track error to external reporting service (ie. Sentry).
+ *
+ * It will take an exception of `unknown` type and normalize it into an error
+ * for reporting.
+ *
+ * All normalization rules should be isolated to `normalizeError` utility.
  */
 export function trackError(
   error: unknown,
-  tag?: string,
+  nameTag?: string,
   metadata?: {
     [key: string]: any
   }
 ): void {
-  let err: Error | string
-  if (error instanceof Error || typeof error === 'string') {
-    err = error
-  } else {
-    // At least send an error which should give us the callstack
-    err = 'Unknown error occurred'
+  const err = normalizeError(error)
+
+  if (err instanceof AggregateErrorFix) {
+    // Track each error individually using a common group tag:
+    const aggregateId = Date.now().toString(16)
+    withScope(scope => {
+      scope.setTag('aggregate.id', aggregateId)
+      err.errors.forEach(e => trackError(e, nameTag, metadata))
+    })
+    return
   }
 
-  if (tag == null) {
-    captureException(err)
-  } else {
-    captureException(err, { event_id: tag, data: metadata })
-  }
+  captureException(err, scope => {
+    scope.setTag('event.name', nameTag)
+    if (metadata) {
+      const context: Record<string, unknown> = {}
+      addMetadataToContext(context, metadata)
+      scope.setContext('Metadata', context)
+    }
+    return scope
+  })
 }
 
 /**
@@ -165,7 +197,7 @@ export function logEvent(event: TrackingEventName, values: TrackingValues = {}):
 
         // Populate referral params:
         const state = getState()
-        const { exchangeRates, account, deviceReferral } = state
+        const { exchangeRates, account, deviceReferral, core } = state
         const { accountReferral } = account
         params.refDeviceInstallerId = deviceReferral.installerId
         params.refDeviceCurrencyCodes = deviceReferral.currencyCodes
@@ -174,6 +206,10 @@ export function logEvent(event: TrackingEventName, values: TrackingValues = {}):
         params.refAccountDate = installerId == null || creationDate == null ? undefined : creationDate.toISOString().replace(/-\d\dT.*/, '')
         params.refAccountInstallerId = accountReferral.installerId
         params.refAccountCurrencyCodes = accountReferral.currencyCodes
+
+        // Get the account age in months:
+        const { created: accountCreatedDate } = core.account
+        params.accountAgeMonths = accountCreatedDate == null ? undefined : monthsBetween(accountCreatedDate, new Date())
 
         // Adjust params:
         if (createdWalletCurrencyCode != null) params.currency = createdWalletCurrencyCode
@@ -185,12 +221,26 @@ export function logEvent(event: TrackingEventName, values: TrackingValues = {}):
           if (conversionType === 'dollar') {
             params.currency = 'USD'
             params.dollarRevenue = Math.abs(Number(conversionValues.dollarRevenue.toFixed(2)))
+          } else if (conversionType === 'buy') {
+            const { destAmount, sourceFiatAmount, sourceFiatCurrencyCode, orderId, fiatProviderId } = conversionValues
+
+            params.destDollarValue = Math.abs(Number(destAmount.displayDollarValue(exchangeRates)))
+            params.destCryptoAmount = Math.abs(Number(destAmount.exchangeAmount))
+            params.destCurrencyCode = destAmount.currencyCode
+            params.dollarValue = params.destDollarValue
+
+            params.sourceFiatValue = Math.abs(Number(sourceFiatAmount)).toFixed(2)
+            params.sourceFiatCurrencyCode = sourceFiatCurrencyCode
+
+            if (orderId != null) params.orderId = orderId
+            if (fiatProviderId != null) params.fiatProviderId = fiatProviderId
           } else if (conversionType === 'sell') {
             const { sourceAmount, destFiatAmount, destFiatCurrencyCode, orderId, fiatProviderId } = conversionValues
 
             params.sourceDollarValue = Math.abs(Number(sourceAmount.displayDollarValue(exchangeRates)))
             params.sourceCryptoAmount = Math.abs(Number(sourceAmount.exchangeAmount))
             params.sourceCurrencyCode = sourceAmount.currencyCode
+            params.dollarValue = params.sourceDollarValue
 
             params.destFiatValue = Math.abs(Number(destFiatAmount)).toFixed(2)
             params.destFiatCurrencyCode = destFiatCurrencyCode
@@ -239,12 +289,25 @@ async function logToPosthog(event: TrackingEventName, values: TrackingValues) {
  * Send a tracking event to the util server.
  */
 async function logToUtilServer(event: TrackingEventName, values: TrackingValues) {
-  await fetchReferral(`api/v1/event`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
-    body: JSON.stringify({ ...values, event })
-  })
+  const body = JSON.stringify({ ...values, event })
+
+  try {
+    const response = await fetchReferral(`api/v1/event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body
+    })
+    if (!response.ok) {
+      const text = await response.text()
+      console.warn(`logToUtilServer:fetch ${event} ${text} body length: ${body.length}`)
+      captureException(new Error(`logToUtilServer:fetch !ok ${event} ${text}`), { event_id: 'logToUtilServer', data: body })
+    }
+  } catch (e) {
+    console.warn(`logToUtilServer:fetch ${event}`)
+    console.warn(e)
+    captureException(e, { event_id: 'logToUtilServer', data: body })
+  }
 }

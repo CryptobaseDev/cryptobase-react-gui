@@ -5,7 +5,6 @@ import {
   EdgeAccount,
   EdgeCurrencyWallet,
   EdgeDenomination,
-  EdgeMemo,
   EdgeSpendInfo,
   EdgeSpendTarget,
   EdgeTokenId,
@@ -17,6 +16,7 @@ import { ActivityIndicator, TextInput, View } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
 import { sprintf } from 'sprintf-js'
 
+import { getFirstOpenInfo } from '../../actions/FirstOpenActions'
 import { showSendScamWarningModal } from '../../actions/ScamWarningActions'
 import { checkAndShowGetCryptoModal } from '../../actions/ScanActions'
 import { playSendSound } from '../../actions/SoundActions'
@@ -34,14 +34,14 @@ import { getExchangeDenom } from '../../selectors/DenominationSelectors'
 import { config } from '../../theme/appConfig'
 import { useState } from '../../types/reactHooks'
 import { useDispatch, useSelector } from '../../types/reactRedux'
-import { EdgeSceneProps } from '../../types/routerTypes'
+import { EdgeAppSceneProps, NavigationBase } from '../../types/routerTypes'
 import { FioRequest, GuiExchangeRates } from '../../types/types'
 import { getCurrencyCode } from '../../util/CurrencyInfoHelpers'
 import { getWalletName } from '../../util/CurrencyWalletHelpers'
 import { addToFioAddressCache, checkRecordSendFee, FIO_FEE_EXCEEDS_SUPPLIED_MAXIMUM, FIO_NO_BUNDLED_ERR_CODE, recordSend } from '../../util/FioAddressUtils'
 import { logActivity } from '../../util/logger'
+import { createEdgeMemo, getDefaultMemoString, getMemoError, getMemoLabel, getMemoTitle } from '../../util/memoUtils'
 import { convertTransactionFeeToDisplayFee, darkenHexColor, DECIMAL_PRECISION, zeroString } from '../../util/utils'
-import { getMemoError, getMemoLabel, getMemoTitle } from '../../util/validateMemos'
 import { AlertCardUi4 } from '../cards/AlertCard'
 import { EdgeCard } from '../cards/EdgeCard'
 import { AccentColors } from '../common/DotsBackground'
@@ -68,7 +68,7 @@ import { ErrorTile } from '../tiles/ErrorTile'
 
 // TODO: Check contentPadding
 
-interface Props extends EdgeSceneProps<'send2'> {}
+interface Props extends EdgeAppSceneProps<'send2'> {}
 
 export interface SendScene2Params {
   walletId: string
@@ -152,7 +152,6 @@ const SendComponent = (props: Props) => {
   const initExpireDate = isoExpireDate != null ? new Date(isoExpireDate) : undefined
   const [processingAmountChanged, setProcessingAmountChanged] = React.useState<boolean>(false)
   const [walletId, setWalletId] = useState<string>(initWalletId)
-  const [spendInfo, setSpendInfo] = useState<EdgeSpendInfo>(initSpendInfo ?? { tokenId: null, spendTargets: [{}] })
   const [fieldChanged, setFieldChanged] = useState<ExchangeFlipInputFields>('fiat')
   const [feeNativeAmount, setFeeNativeAmount] = useState<string>('')
   const [minNativeAmount, setMinNativeAmount] = useState<string | undefined>(initMinNativeAmount)
@@ -180,9 +179,24 @@ const SendComponent = (props: Props) => {
   const hasNotifications = useSelector(state => state.ui.notificationHeight > 0)
 
   const currencyWallets = useWatch(account, 'currencyWallets')
-  const [tokenId, setTokenId] = useState<EdgeTokenId>(spendInfo.tokenId ?? tokenIdProp)
   const coreWallet = currencyWallets[walletId]
   const { pluginId, memoOptions = [] } = coreWallet.currencyInfo
+
+  // Initialize `spendInfo` from route params, including possible memos
+  const [spendInfo, setSpendInfo] = useState<EdgeSpendInfo>(() => {
+    if (initSpendInfo == null) return { tokenId: null, spendTargets: [{}] }
+
+    const spendTarget = initSpendInfo.spendTargets[0]
+    const uniqueIdentifier = getDefaultMemoString(initSpendInfo, spendTarget)
+
+    if (uniqueIdentifier == null || spendTarget.publicAddress == null) {
+      return initSpendInfo
+    } else {
+      return { ...initSpendInfo, memos: [createEdgeMemo(memoOptions, uniqueIdentifier)] }
+    }
+  })
+
+  const [tokenId, setTokenId] = useState<EdgeTokenId>(spendInfo.tokenId ?? tokenIdProp)
   const currencyCode = getCurrencyCode(coreWallet, tokenId)
   const cryptoDisplayDenomination = useDisplayDenom(coreWallet.currencyConfig, tokenId)
   const cryptoExchangeDenomination = getExchangeDenom(coreWallet.currencyConfig, tokenId)
@@ -202,7 +216,10 @@ const SendComponent = (props: Props) => {
   const pendingInsufficientFees = React.useRef<InsufficientFundsError | undefined>(undefined)
 
   async function showInsufficientFeesModal(error: InsufficientFundsError): Promise<void> {
-    await Airship.show(bridge => <InsufficientFeesModal bridge={bridge} coreError={error} navigation={navigation} wallet={coreWallet} />)
+    const { countryCode } = await getFirstOpenInfo()
+    await Airship.show(bridge => (
+      <InsufficientFeesModal bridge={bridge} countryCode={countryCode} coreError={error} navigation={navigation as NavigationBase} wallet={coreWallet} />
+    ))
   }
 
   const handleChangeAddress =
@@ -290,7 +307,7 @@ const SendComponent = (props: Props) => {
           lockInputs={lockTilesMap.address}
           isCameraOpen={doOpenCamera}
           fioToAddress={fioAddress}
-          navigation={navigation}
+          navigation={navigation as NavigationBase}
         />
       )
     }
@@ -397,14 +414,16 @@ const SendComponent = (props: Props) => {
   }
 
   const handleWalletPress = useHandler(() => {
-    Airship.show<WalletListResult>(bridge => <WalletListModal bridge={bridge} headerTitle={lstrings.fio_src_wallet} navigation={navigation} />)
+    Airship.show<WalletListResult>(bridge => (
+      <WalletListModal bridge={bridge} headerTitle={lstrings.fio_src_wallet} navigation={navigation as NavigationBase} />
+    ))
       .then(result => {
         if (result?.type !== 'wallet') {
           return
         }
         setWalletId(result.walletId)
         const { pluginId: newPluginId } = currencyWallets[result.walletId].currencyInfo
-        if (pluginId !== newPluginId || currencyCode !== result.currencyCode) {
+        if (pluginId !== newPluginId || tokenId !== result.tokenId) {
           setTokenId(result.tokenId)
           setSpendInfo({ tokenId: result.tokenId, spendTargets: [{}] })
         }
@@ -568,7 +587,7 @@ const SendComponent = (props: Props) => {
 
     return (
       <SelectFioAddress2
-        navigation={navigation}
+        navigation={navigation as NavigationBase}
         selected={fioSender.fioAddress}
         memo={fioSender.memo}
         memoError={fioSender.memoError}
@@ -585,7 +604,7 @@ const SendComponent = (props: Props) => {
   // Only supports the first spendTarget that has a `memo` or `uniqueIdentifier`
   const renderUniqueIdentifier = () => {
     const spendTarget = spendInfo.spendTargets[0]
-    const uniqueIdentifier = spendInfo.memos?.[0]?.value ?? spendTarget?.memo ?? spendTarget?.uniqueIdentifier
+    const uniqueIdentifier = getDefaultMemoString(spendInfo, spendTarget)
     const [memoOption] = memoOptions.filter(option => option.hidden !== true)
 
     if (memoOption != null && spendTarget.publicAddress != null) {
@@ -602,12 +621,6 @@ const SendComponent = (props: Props) => {
         maxLength = 2 * memoOption.maxBytes
       }
 
-      const createEdgeMemo = (text: string): EdgeMemo => ({
-        type: memoOption.type,
-        memoName: memoOption.memoName,
-        value: text
-      })
-
       const handleUniqueIdentifier = async () => {
         await Airship.show<string | undefined>(bridge => (
           <TextInputModal
@@ -619,11 +632,11 @@ const SendComponent = (props: Props) => {
             message={sprintf(lstrings.unique_identifier_modal_description, memoLabel)}
             submitLabel={lstrings.unique_identifier_modal_confirm}
             title={memoTitle}
-            onSubmit={async text => getMemoError(createEdgeMemo(text), memoOption) ?? true}
+            onSubmit={async text => getMemoError(createEdgeMemo(memoOptions, text), memoOption) ?? true}
           />
         )).then(value => {
           if (value == null) return
-          spendInfo.memos = [createEdgeMemo(value)]
+          spendInfo.memos = [createEdgeMemo(memoOptions, value)]
           setSpendInfo({ ...spendInfo })
         })
       }
@@ -919,7 +932,7 @@ const SendComponent = (props: Props) => {
   // Mount/Unmount life-cycle events:
   useMount(() => {
     if (doCheckAndShowGetCryptoModal) {
-      dispatch(checkAndShowGetCryptoModal(navigation, coreWallet, tokenId)).catch(err => showError(err))
+      dispatch(checkAndShowGetCryptoModal(navigation as NavigationBase, coreWallet, tokenId)).catch(err => showError(err))
     }
   })
   useUnmount(() => {

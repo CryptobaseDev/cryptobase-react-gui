@@ -44,7 +44,22 @@ export class FiatProviderError extends Error {
   readonly quoteError: FiatProviderQuoteError
 
   constructor(info: FiatProviderQuoteError) {
-    super('FiatProviderError')
+    function getMessage(): string {
+      switch (info.errorType) {
+        case 'overLimit':
+          return `Over limit: ${info.errorAmount} ${info.displayCurrencyCode}`
+        case 'underLimit':
+          return `Under limit: ${info.errorAmount} ${info.displayCurrencyCode}`
+        case 'regionRestricted':
+          return `Region restricted: ${info.displayCurrencyCode}`
+        case 'assetUnsupported':
+          return `Asset unsupported`
+        case 'paymentUnsupported':
+          return 'Payment unsupported'
+      }
+    }
+    super(getMessage())
+    this.name = 'FiatProviderError'
     this.quoteError = info
   }
 }
@@ -131,11 +146,13 @@ export interface FiatProvider<OtherMethods = null> {
 }
 
 export type FiatProviderGetTokenId = (pluginId: string, currencyCode: string) => EdgeTokenId | undefined
+export type FiatProviderGetTokenIdFromContract = (params: { pluginId: string; contractAddress: string }) => EdgeTokenId | undefined
 export type FiatProviderMakeUuid = () => Promise<string>
 export interface FiatProviderFactoryParams {
   deviceId: string
   io: { store: FiatProviderStore; makeUuid: FiatProviderMakeUuid }
   getTokenId: FiatProviderGetTokenId
+  getTokenIdFromContract: FiatProviderGetTokenIdFromContract
   apiKeys?: unknown // Data specific to the requirements of each provider,
   // which lets the provider know that these orders were made from within Edge.
   // Typically an API key, but can be some other information like a client ID.

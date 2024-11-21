@@ -4,12 +4,13 @@ import TestRenderer from 'react-test-renderer'
 
 import { SettingsScene } from '../../components/scenes/SettingsScene'
 import { FakeProviders, FakeState } from '../../util/fake/FakeProviders'
-import { fakeSceneProps } from '../../util/fake/fakeSceneProps'
+import { fakeEdgeAppSceneProps } from '../../util/fake/fakeSceneProps'
 
 describe('SettingsScene', () => {
   const mockState: FakeState = {
     core: {
       account: {
+        rootLoginId: 'XXX',
         currencyConfig: {},
         username: 'some user',
         watch: () => () => {}
@@ -24,7 +25,7 @@ describe('SettingsScene', () => {
   it('should render SettingsScene', () => {
     const renderer = TestRenderer.create(
       <FakeProviders initialState={mockState}>
-        <SettingsScene {...fakeSceneProps('settingsOverview', {})} />
+        <SettingsScene {...fakeEdgeAppSceneProps('settingsOverview', undefined)} />
       </FakeProviders>
     )
 

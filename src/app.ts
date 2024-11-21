@@ -6,6 +6,7 @@
  */
 // import './wdyr'
 import * as Sentry from '@sentry/react-native'
+import { Buffer } from 'buffer'
 import { asObject, asString } from 'cleaners'
 import { LogBox, Text, TextInput } from 'react-native'
 import { getVersion } from 'react-native-device-info'
@@ -34,7 +35,13 @@ if (ENV.SENTRY_ORGANIZATION_SLUG.includes('SENTRY_ORGANIZATION')) {
 
     // Initialize Sentry within native iOS and Android code so we can catch crashes at
     // early app startup.
-    autoInitializeNativeSdk: false
+    autoInitializeNativeSdk: false,
+
+    integrations: [
+      Sentry.breadcrumbsIntegration({
+        console: false
+      })
+    ]
   })
 }
 
@@ -271,3 +278,5 @@ if (ENV.DEBUG_THEME) {
 
 initDeviceSettings().catch(err => console.log(err))
 initInfoServer().catch(err => console.log(err))
+
+if (global.Buffer == null) global.Buffer = Buffer

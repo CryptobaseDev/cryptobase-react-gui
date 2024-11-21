@@ -12,12 +12,13 @@ import * as React from 'react'
 import { ActivityIndicator, ListRenderItemInfo, View } from 'react-native'
 import { FlatList } from 'react-native-gesture-handler'
 
+import { getFirstOpenInfo } from '../../actions/FirstOpenActions'
 import { SCROLL_INDICATOR_INSET_FIX } from '../../constants/constantSettings'
 import { useAsyncEffect } from '../../hooks/useAsyncEffect'
 import { useHandler } from '../../hooks/useHandler'
 import { lstrings } from '../../locales/strings'
 import { useSelector } from '../../types/reactRedux'
-import { EdgeSceneProps } from '../../types/routerTypes'
+import { EdgeAppSceneProps, NavigationBase } from '../../types/routerTypes'
 import { convertTransactionFeeToDisplayFee, truncateDecimals } from '../../util/utils'
 import { SceneWrapper } from '../common/SceneWrapper'
 import { InsufficientFeesModal } from '../modals/InsufficientFeesModal'
@@ -35,7 +36,7 @@ export interface SweepPrivateKeyCalculateFeeParams {
   sweepPrivateKeyList: SweepPrivateKeyItem[]
 }
 
-interface Props extends EdgeSceneProps<'sweepPrivateKeyCalculateFee'> {}
+interface Props extends EdgeAppSceneProps<'sweepPrivateKeyCalculateFee'> {}
 
 const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
   const { navigation, route } = props
@@ -44,11 +45,21 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
   const theme = useTheme()
   const styles = getStyles(theme)
 
+  const defaultFiat = useSelector(state => state.ui.settings.defaultIsoFiat)
   const exchangeRates = useSelector(state => state.exchangeRates)
   const displayDenominations = useSelector(state => {
     const { denominationSettings = {} } = state.ui.settings
     return denominationSettings
   })
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', ev => {
+      if (sweepPrivateKeyList.length === 1) {
+        memoryWallet.close().catch(() => {})
+      }
+    })
+    return unsubscribe
+  }, [memoryWallet, navigation, sweepPrivateKeyList.length])
 
   const mounted = React.useRef<boolean>(true)
 
@@ -88,7 +99,7 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
       const exchangeDenom = denominations.find(denom => denom.name === currencyCode) as EdgeDenomination
       const displayDenom = displayDenominations[pluginId]?.[currencyCode] ?? exchangeDenom
 
-      const transactionFee = convertTransactionFeeToDisplayFee(currencyCode, receivingWallet.fiatCurrencyCode, exchangeRates, tx, displayDenom, exchangeDenom)
+      const transactionFee = convertTransactionFeeToDisplayFee(currencyCode, defaultFiat, exchangeRates, tx, displayDenom, exchangeDenom)
       const fiatAmount = transactionFee.fiatAmount === '0' ? '0' : ` ${transactionFee.fiatAmount}`
       const feeSyntax = `${transactionFee.cryptoSymbol ?? ''} ${truncateDecimals(transactionFee.cryptoAmount)} (${
         transactionFee.fiatSymbol ?? ''
@@ -100,7 +111,10 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
   })
 
   const handleInsufficientFunds = useHandler(async (wallet, error) => {
-    await Airship.show(bridge => <InsufficientFeesModal bridge={bridge} coreError={error} navigation={navigation} wallet={wallet} />)
+    const { countryCode } = await getFirstOpenInfo()
+    await Airship.show(bridge => (
+      <InsufficientFeesModal bridge={bridge} countryCode={countryCode} coreError={error} navigation={navigation as NavigationBase} wallet={wallet} />
+    ))
   })
 
   const handleSlidingComplete = useHandler(() => {
@@ -122,6 +136,7 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
       const tokenItems = [...sweepPrivateKeyList]
       const mainnetItem = tokenItems.splice(sweepPrivateKeyList.length - 1, 1)[0]
       const publicAddress = (await receivingWallet.getReceiveAddress({ tokenId: null })).publicAddress
+      let enableSlider = false
 
       const getMax = async (asset: SweepPrivateKeyItem, numPendingTxs: number) => {
         const fakeEdgeTransaction: EdgeTransaction = {
@@ -164,6 +179,7 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
           if (lt(memoryWallet.balanceMap.get(null) ?? '0', feeTotal)) {
             throw new InsufficientFundsError({ tokenId: null, networkFee: feeTotal })
           }
+          enableSlider = true
         } catch (e) {
           const insufficientFundsError = asMaybeInsufficientFundsError(e)
           if (insufficientFundsError != null) {
@@ -177,7 +193,7 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
       await Promise.all(tokenItems.map(async (item, index) => await getMax(item, index)))
       await getMax(mainnetItem, tokenItems.length)
 
-      if (mounted.current) {
+      if (enableSlider && mounted.current) {
         setSliderDisabled(false)
       }
 
@@ -189,6 +205,8 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
     'SweepPrivateKeyCalculateFeeComponent'
   )
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const extraData = React.useMemo(() => [], [transactionState, exchangeRates])
   const keyExtractor = useHandler((item: SweepPrivateKeyItem) => item.key)
 
   return (
@@ -201,7 +219,7 @@ const SweepPrivateKeyCalculateFeeComponent = (props: Props) => {
         <FlatList
           automaticallyAdjustContentInsets={false}
           data={sweepPrivateKeyList}
-          extraData={transactionState}
+          extraData={extraData}
           keyExtractor={keyExtractor}
           renderItem={renderCurrencyRow}
           scrollIndicatorInsets={SCROLL_INDICATOR_INSET_FIX}

@@ -2,11 +2,200 @@
 
 ## Unreleased
 
+## 4.17.1
+
+- added: (Zcash) Add NU6 support
+
+## 4.18.0
+
+- added: Close button (X) for `EdgeModals,` specifically if a desktop platform is detected.
+- changed: Auto-enable required tokens when navigating to `Stake*` scenes
+- fixed: Incorrect `SwapInput` amounts on `SwapCreateScene` after changing wallet.
+- fixed: Backing up a light account while on the `FiatPluginEnterAmountScene` retains light account-related quote errors
+- fixed: Various `EarnScene` display bugs
+- fixed: `EarnScene` missing wallet creation option in "Discover" view
+
+## 4.17.0 (2024-11-12)
+
+- added: Add TON
+- added: Log swap errors to Sentry.
+- added: Tracking for unexpected fiat provider errors.
+- added: Add TON support to Banxa, Moonpay, Paybis, and Simplex fiat plugins
+- added: Add OSMO support to Moonpay fiat plugin
+- added: New post-install survey option for "BTCTKVR Magazine".
+- changed: Redesign `StakingReturnsCard,` specifically for `StakeOverviewScene`
+- changed: `EarnScene` shows all possible stake options, instead of only those for enabled wallets
+- changed: `EarnScene` shows one card per stake option if multiple wallets have stake positions on that stake option
+- changed: `EarnScene` only intializes stake options once, regardless of re-navigation to the scene
+- changed: `FiatProviderError` messages now include `FiatProviderQuoteError` info.
+- changed: (Android) Add prompt for user to change battery optimization setting
+- changed: Add explicit gas limit for Kiln staking.
+- changed: Various strings updated to UK compliance spec
+- changed: Track array of errors or AggregateErrors separately with a common tag
+- changed: Use stack-specific scene navigation props instead of `NavigationProp`
+- changed: Verbiage for login request scene for QR login has been updated to remove ambiguity.
+- changed: Wording in light account persistent notification
+- changed: (Android) Allow exporting multiple files
+- fixed: Replace deprecated Unstoppable Domains fetch call with SDK
+- fixed: Correctly report ETH Kiln balances
+- fixed: Fix error massaging in trackError
+- fixed: Normalized error messages for tracking; removing localization from error messages.
+- fixed: Remove Kado deposit details for "Sell" orders.
+- fixed: Sentry tagging and metadata data wasn't formed properly and caused some loss of tracked errors.
+- fixed: Use Sentry context for logging metadata in `EdgeCrashEvent`
+- fixed: Fix `currencyWallets` object reference in deep link paths that support wallet creation
+- removed: Bank Wire Transfer Buy for Florida
+- removed: Paypal Sell for Canada
+- removed: Moonpay, Simplex, and Paybis for UK
+- removed: UK persistent investment risk banner
+
+## 4.16.0 (2024-10-30)
+
+- added: "Transaction Details" button to `SwapSuccessScene`
+- added: `WalletRestoreScene`
+- added: Button to access the `WalletRestoreScene` on `WalletListScene` if applicable
+- added: "Go to Parent Wallet" `WalletListMenuModal` option
+- added: Earn Scene
+- added: Include wallet creation date in wallet data in log output
+- changed: Allow 0 amount entry in `SpendingLimitsScene`
+- changed: Wording on `SwapSuccessScene`
+- changed: `SettingsScene` disables "Restore Wallets" option if there are no wallets to restore
+- changed: FIO Home Scene tile replaced with Earn
+- changed: Stake Overview Scene `StakingReturnsCard` redesigned
+- changed: Android `AutoLogoutModal` duration picker
+- changed: Enable Ethereum staking
+- changed: Prevent exchange rate fluctuations from restarting transaction list stream
+- changed: Call `saveTx` after signing or broadcasting transactions from WalletConnect
+- changed: Navigate to wallet list after restoring wallets
+- changed: Update `NotificationCard` to UI4 styling
+- changed: Remove legacy non-segwit wallets from new account wallet selection scene
+- fixed: Deeplinking to `SendScene` may not retain memo information in the resulting broadcast
+- fixed: Use account default fiat for transaction fee display in `SweepPrivateKeyCalculateFeeScene`
+- fixed: Crash when archiving a wallet that recently accessed the trade modal
+- fixed: ACH sell option for Florida visible with no accepted currencies
+- fixed: Slow `TransactionDetailsScene` navigation on slow networks
+
+## 4.15.1 (2024-10-21)
+
+- fixed: "Apple Pay" title per latest branding requirements
+
+## 4.15.0 (2024-10-16)
+
+- added: Add Maya Protocol
+- added: Battery Saver warning message for Android
+- added: Buy conversion tracking for Moonpay
+- added: Buy conversion tracking for Paybis
+- added: Support for return.edge.app deeplinks
+- added: Error tracking for failure to report conversions to referral server
+- changed: Remove whitespaces from custom token contract address input
+- changed: Use unique ENV configs for thorchain and thorchainda swap plugins
+- fixed: Correctly tag `tokenApproval` `actionType` in `getTxActionDisplayInfo`
+- fixed: Fixed obscured "done" button display bug on Sepa info display scene for small-screen devices
+- fixed: URI encoding in Paybis return URIs
+- fixed: AddressTile2 touchable area states
+- fixed: Cases where it was possible to create duplicate custom tokens
+- fixed: Clear previous swap errors when new amounts are entered or swap assets are changed in `SwapCreateScene`
+- fixed: Handle race condition when navigating to a token's transaction list which requires token activation (XRP, Algorand, etc)
+- fixed: Message about overriding a built-in token contract, which is not possible to do
+- fixed: Round Kado-provided amounts during sell
+- fixed: "Contacts Access" setting could be out of sync with the OS-level contacts access setting
+
+## 4.14.1 (2024-09-30)
+
+- added: Foreground push notification title data displayed in dropdown
+- changed: More informative buy amount limit errors for light accounts
+- fixed: Default buy amounts for light accounts can potentially be over limit for non-USD currencies
+
+## 4.14.0 (2024-09-30)
+
+- added: `ExpandableList` component, replacing the address hint dropdown in `AddressFormScene`
+- added: Add 'Cris Cyborg,' 'Free Talk Live,' and 'Crypto Canal' options to survey modal
+- added: Buy with Revolut
+- added: Buy/sell with Paypal
+- added: Foreground push notifications displayed in app
+- added: Minimum receive amount to `SwapConfirmationScene`
+- added: New analytics tracking param: `accountAgeMonths`
+- added: Sell with Moonpay
+- changed: Enable Cardano staking
+- changed: Added Iraq to list of Visa/MC supported countries
+- changed: Display Asset Status cards in the same style as Promo Cards
+- changed: Updated ACH supported US states
+- changed: Use new platform-specific `assetStatsCards2` info server data
+- fixed: Missing ellipses for long usernames displayed in the `SideMenu`
+- fixed: Inconsistent content of address hint dropdown between iOS and Android in `AddressFormScene`
+- fixed: Allow `InfoCardCarousel` to receive undefined `countryCodes`
+- fixed: Crash on HomeScene when logging while in airplane mode
+- fixed: Inconsistent corners in `SideMenu`
+- fixed: "Most Recent Wallets" do not show those chosen through `fiatPlugin`
+- fixed: "Apple Pay" renamed to "Pay with Apple Pay" to align with branding guidelines
+
+## 4.13.0 (2024-09-18)
+
+- added: Add 'Free Talk Live' and 'Crypto Canal' options to survey modal
+- added: Cardano staking through Kiln staking pools
+- added: Include custom tokens within wallet data in log output
+- added: Support for `isLiquidStaking` field on staking policies
+- added: Warning message about risks of investing to all UK IPs
+- changed: Allow private key sweep in light accounts for amounts less than $50
+- changed: Allow reverse quotes for Kado
+- changed: Credit card allowed countries to add Botswana, Cambodia, Panama, and Sri Lanka
+- changed: Determine Moonpay asset support using chainCode/contractAddress
+- changed: Restrict Bity buy/sell to no-KYC asset
+- changed: Some unecessary `showError` dropdowns demoted to hidden `showDevError`
+- fixed: "FIO Address does not exist" error after transferring a FIO name
+- fixed: Crypto amount display bug after flipping the wallet input on `SwapCreateScne`
+- fixed: Default swap pair logic from the trade modal was not prioritizing mainnet assets
+- fixed: Fix incorrect string comparison resulting in wrong rate used for 24 change calculation
+- removed: 'fasterpayments' payment type
+- removed: Turking bank transfer support
+
+## 4.12.0 (2024-08-30)
+
+- added: `CryptoIcon` logo support to displayed request QR codes
+- added: Initial implementation of `SceneHeaderUi4`
+- added: App distribution via Zealot
+- added: Add disableSurveyModal option
+- added: Ethereum (Holesky) staking via Kiln
+- added: dRPC api key option for EVM chains
+- added: Handle KYC error responses from Bity
+- changed: Use a $50 USD default fiat purchase amount for light accounts
+- changed: Enable Bitpay payments for FIO names and domains
+- changed: Disable Home scene swap and FIO cards if configured
+- changed: Allow some chains to be disabled in env.json
+- changed: Use quoteAllocations to create amount rows in StakeModifyScene
+- changed: Add more metadata to zealot upload
+- changed: Token swap error demoted to red error dropdown to a toast
+- changed: 1 cent minimum requirement for high fee warning
+- changed: "Guest Account (<3 characters of loginId>)" shown in `SideMenu` if more than 1 account and logged in to a light account
+- changed: No account name shown in `SideMenu` if only a single light account exists on the device
+- changed: Properly escape newlines in Zealot changelog
+- fixed: `Carousel` cards not showing in iOS after new account creation until any scroll gesture performed, if there is only one `Carousel` card to display
+- fixed: Cutoff UI in `CreateWalletImportScene` when keyboard open
+- fixed: Unecessary eye icon in `CreateWalletImportScene` text input field
+- fixed: PoweredBy card displaying custom system fonts
+- fixed: Inconsistent button UI in `SwapSuccessScene`
+- fixed: Keyboard remaining visible when opening the side menu
+- fixed: Do not spin forever if the spam filter eliminates too many transactions.
+- fixed: FIO OBT data not showing in received transaction memos
+- fixed: Fix broken Bity message signing
+- fixed: Return underLimit error for Simplex for very small quotes
+- fixed: FIO stake/unstake transactions displaying as sent/received transactions
+- removed: Removed pull-to-search feature from wallet list and transaction list scenes
+
+## 4.11.0 (2024-08-19)
+
 - added: Kado buy via wire transfer
+- added: Allow for Maestro specific iOS and Android builds
+- added: Video blogs/posts on HomeScene
 - changed: Use partners API to determine US state support for Mooopay, Simplex, and Banxa
 - changed: Conditionalize use of Paybis promoCodes for new users <$1k purchases
+- changed: Cache exchange rates for five minutes to account for server or connection instability
+- changed: Query supported countries and US states for fiat plugins
+- fixed: Disable max spend for zkSync
+- fixed: Do not show duplicate password-recovery modals when launching a freshly-installed app for the first time.
+- fixed: If handling a deep link requires a signed-in account, correctly save it for later.
 
-## 4.10.0
+## 4.10.0 (2024-08-07)
 
 - added: Network names to wallet list cards
 - added: 0x Gasless Swap exchange plugin
@@ -29,6 +218,10 @@
 - fixed: Broken link in "Help Closing App"
 - fixed: Incorrect best quote picking for sell plugins
 - fixed: Buying non-BTC assets with Bity
+- fixed: Misc styling fixes on SepaFormScene and AddressFormScene
+- fixed: Pressing back during native fiat buy/sell flows results in stuck button spinners
+- fixed: Broken Android paste into `TextInputModal` in "ScanQR" -> "Enter"
+- fixed: Promo cards not visible until scroll for new accounts
 
 ## 4.9.2 (2024-07-22)
 

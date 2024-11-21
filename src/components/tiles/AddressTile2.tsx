@@ -131,7 +131,7 @@ export const AddressTile2 = React.forwardRef((props: Props, ref: React.Forwarded
       // Check is PaymentProtocolUri
       if (!!parsedUri.paymentProtocolUrl && !parsedUri.publicAddress) {
         await launchPaymentProto(navigation, account, parsedUri.paymentProtocolUrl, {
-          currencyCode,
+          tokenId,
           navigateReplace: true,
           wallet: coreWallet
         }).catch(error => showError(error))
@@ -154,7 +154,7 @@ export const AddressTile2 = React.forwardRef((props: Props, ref: React.Forwarded
           showError(new PaymentProtoError('CurrencyNotSupported', { text: currencyInfo.currencyCode }))
         } else {
           await launchPaymentProto(navigation, account, parsedLink.uri, {
-            currencyCode,
+            tokenId,
             navigateReplace: true,
             wallet: coreWallet
           }).catch(error => showError(error))
@@ -174,7 +174,7 @@ export const AddressTile2 = React.forwardRef((props: Props, ref: React.Forwarded
       await coreWallet.parseUri(clipboard, currencyCode)
       await changeAddress(clipboard)
     } catch (error) {
-      showError(error)
+      showError(error, { trackError: false })
     }
   })
 
@@ -240,9 +240,7 @@ export const AddressTile2 = React.forwardRef((props: Props, ref: React.Forwarded
   })
 
   const handleTilePress = useHandler(async () => {
-    if (!lockInputs && !!recipientAddress) {
-      resetSendTransaction()
-    }
+    resetSendTransaction()
   })
 
   // ---------------------------------------------------------------------------
@@ -266,7 +264,7 @@ export const AddressTile2 = React.forwardRef((props: Props, ref: React.Forwarded
   const tileType = !!recipientAddress && !lockInputs ? 'delete' : 'none'
 
   return (
-    <EdgeRow rightButtonType={tileType} loading={loading} title={title} onPress={handleTilePress}>
+    <EdgeRow rightButtonType={tileType} loading={loading} title={title} onPress={!lockInputs && !!recipientAddress ? handleTilePress : undefined}>
       {!recipientAddress && (
         <EdgeAnim style={styles.buttonsContainer} enter={{ type: 'stretchInY' }} exit={{ type: 'stretchOutY' }}>
           <EdgeTouchableOpacity style={styles.buttonContainer} onPress={handleChangeAddress}>

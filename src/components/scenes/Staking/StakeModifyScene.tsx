@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Image, View } from 'react-native'
 import { sprintf } from 'sprintf-js'
 
+import { useAsyncEffect } from '../../../hooks/useAsyncEffect'
 import { useDisplayDenom } from '../../../hooks/useDisplayDenom'
 import { lstrings } from '../../../locales/strings'
 import {
@@ -17,15 +18,17 @@ import {
   StakePosition
 } from '../../../plugins/stake-plugins/types'
 import { getExchangeDenomByCurrencyCode } from '../../../selectors/DenominationSelectors'
+import { HumanFriendlyError } from '../../../types/HumanFriendlyError'
 import { useSelector } from '../../../types/reactRedux'
-import { EdgeSceneProps } from '../../../types/routerTypes'
+import { EdgeAppSceneProps } from '../../../types/routerTypes'
 import { getCurrencyIconUris } from '../../../util/CdnUris'
 import { getTokenIdForced, getWalletTokenId } from '../../../util/CurrencyInfoHelpers'
 import { getWalletName } from '../../../util/CurrencyWalletHelpers'
-import { getPolicyIconUris, getPositionAllocations } from '../../../util/stakeUtils'
+import { enableStakeTokens, getPolicyIconUris, getPositionAllocations } from '../../../util/stakeUtils'
 import { toBigNumberString } from '../../../util/toBigNumberString'
 import { zeroString } from '../../../util/utils'
 import { EdgeCard } from '../../cards/EdgeCard'
+import { WarningCard } from '../../cards/WarningCard'
 import { SceneWrapper } from '../../common/SceneWrapper'
 import { withWallet } from '../../hoc/withWallet'
 import { ButtonsModal } from '../../modals/ButtonsModal'
@@ -33,7 +36,7 @@ import { FlipInputModal2, FlipInputModalResult } from '../../modals/FlipInputMod
 import { FlashNotification } from '../../navigation/FlashNotification'
 import { FillLoader } from '../../progress-indicators/FillLoader'
 import { EdgeRow } from '../../rows/EdgeRow'
-import { Airship, showError } from '../../services/AirshipInstance'
+import { Airship, showDevError, showError } from '../../services/AirshipInstance'
 import { cacheStyles, Theme, useTheme } from '../../services/ThemeContext'
 import { Alert } from '../../themed/Alert'
 import { EdgeText } from '../../themed/EdgeText'
@@ -52,11 +55,9 @@ export interface StakeModifyParams {
   modification: ChangeQuoteRequest['action']
 }
 
-interface Props extends EdgeSceneProps<'stakeModify'> {
+interface Props extends EdgeAppSceneProps<'stakeModify'> {
   wallet: EdgeCurrencyWallet
 }
-
-// TODO: Check contentPadding
 
 const StakeModifySceneComponent = (props: Props) => {
   const { navigation, route, wallet } = props
@@ -70,7 +71,19 @@ const StakeModifySceneComponent = (props: Props) => {
 
   // ChangeQuote that gets rendered in the rows
   const [changeQuote, setChangeQuote] = React.useState<ChangeQuote | null>(null)
-  const changeQuoteAllocations = changeQuote?.allocations ?? []
+  const changeQuoteAllocations =
+    changeQuote?.allocations ??
+    stakePolicy.stakeAssets.reduce((quoteAllocations: QuoteAllocation[], asset) => {
+      if (modification === 'stake' || modification === 'unstake') {
+        quoteAllocations.push({
+          allocationType: modification,
+          pluginId: asset.pluginId,
+          currencyCode: asset.currencyCode,
+          nativeAmount: '0'
+        })
+      }
+      return quoteAllocations
+    }, [])
   const { quoteInfo } = changeQuote ?? {}
 
   // Request that the user will modify, triggering a ChangeQuote recalculation
@@ -90,6 +103,15 @@ const StakeModifySceneComponent = (props: Props) => {
   // Error message tile contents
   const [errorMessage, setErrorMessage] = React.useState('')
 
+  // Ensure required tokens are enabled
+  useAsyncEffect(
+    async () => {
+      await enableStakeTokens(account, wallet, stakePolicy)
+    },
+    [],
+    'StakeModifyScene'
+  )
+
   React.useEffect(() => {
     // Initialize the claim row since the user would never modify the amount
     if (modification === 'claim' && changeQuoteRequest.nativeAmount === '0') {
@@ -97,6 +119,12 @@ const StakeModifySceneComponent = (props: Props) => {
         ...changeQuoteRequest,
         currencyCode: stakePolicy.rewardAssets[0].currencyCode,
         nativeAmount: existingAllocations.earned[0].nativeAmount
+      })
+    } else if ((modification === 'stake' || modification === 'unstake') && stakePolicy.isLiquidStaking === true) {
+      setChangeQuoteRequest({
+        ...changeQuoteRequest,
+        currencyCode: stakePolicy.rewardAssets[0].currencyCode,
+        nativeAmount: '1' // Amounts for liquid staking are a noop
       })
     } else if (modification === 'unstake' && mustMaxUnstake) {
       setChangeQuoteRequest({
@@ -138,7 +166,7 @@ const StakeModifySceneComponent = (props: Props) => {
                   setErrorMessage(errMessage)
                 })
                 .catch(err => {
-                  showError(err)
+                  showDevError(err)
                   setErrorMessage(errMessage)
                 })
             } else {
@@ -150,6 +178,8 @@ const StakeModifySceneComponent = (props: Props) => {
             setErrorMessage(errMessage)
           } else if (err instanceof InsufficientFundsError) {
             setErrorMessage(lstrings.exchange_insufficient_funds_title)
+          } else if (err instanceof HumanFriendlyError) {
+            setErrorMessage(err.message)
           } else {
             showError(err)
             setErrorMessage(lstrings.unknown_error_occurred_fragment)
@@ -294,18 +324,14 @@ const StakeModifySceneComponent = (props: Props) => {
   const theme = useTheme()
   const styles = getStyles(theme)
 
-  const renderEditableQuoteAmountRow = (allocationType: 'stake' | 'unstake' | 'claim', asset: { pluginId: string; currencyCode: string }) => {
-    const { pluginId, currencyCode } = asset
-    const tokenId = getTokenIdForced(account, pluginId, currencyCode)
-    const quoteAllocation: QuoteAllocation | undefined =
-      changeQuote != null
-        ? changeQuote.allocations.find(
-            allocation => allocationType === allocation.allocationType && allocation.pluginId === pluginId && allocation.currencyCode === currencyCode
-          )
-        : allocationType === 'unstake' && mustMaxUnstake
-        ? { allocationType, pluginId: asset.pluginId, currencyCode: asset.currencyCode, nativeAmount: existingAllocations?.staked[0]?.nativeAmount ?? '0' }
-        : undefined
+  const renderEditableQuoteAmountRow = (quoteAllocation: QuoteAllocation) => {
+    const { currencyCode, pluginId, allocationType } = quoteAllocation
+    quoteAllocation =
+      allocationType === 'unstake' && mustMaxUnstake
+        ? { allocationType, pluginId, currencyCode, nativeAmount: existingAllocations?.staked[0]?.nativeAmount ?? '0' }
+        : quoteAllocation
 
+    const tokenId = getTokenIdForced(account, pluginId, currencyCode)
     const quoteCurrencyCode = currencyCode
     const quoteDenom = getExchangeDenomByCurrencyCode(account.currencyConfig[pluginId], quoteCurrencyCode)
 
@@ -319,18 +345,14 @@ const StakeModifySceneComponent = (props: Props) => {
         : sprintf(lstrings.stake_amount_s_unstake, quoteCurrencyCode)
 
     const nativeAmount = zeroString(quoteAllocation?.nativeAmount) ? '' : quoteAllocation?.nativeAmount ?? ''
-    const { nativeAmount: earnedAmount = '0', locktime } = existingAllocations.earned[0] ?? {}
-    if (isClaim && locktime != null && Date.now() < new Date(locktime).valueOf()) {
-      return null
-    }
 
     return (
-      <EdgeCard>
+      <EdgeCard key={`${allocationType}${pluginId}${currencyCode}`}>
         <EditableAmountTile
           title={title}
           key={allocationType + pluginId + currencyCode}
           exchangeRates={guiExchangeRates}
-          nativeAmount={isClaim ? earnedAmount : nativeAmount}
+          nativeAmount={nativeAmount}
           currencyCode={quoteCurrencyCode}
           exchangeDenomination={quoteDenom}
           displayDenomination={quoteDenom}
@@ -443,24 +465,17 @@ const StakeModifySceneComponent = (props: Props) => {
 
   const renderChangeQuoteAmountTiles = (modification: ChangeQuoteRequest['action']) => {
     const networkFeeQuote = changeQuoteAllocations.find(allocation => allocation.allocationType === 'networkFee')
+    const stakeUnstakeAllocations = changeQuoteAllocations.filter(alloc => alloc.allocationType === 'stake' || alloc.allocationType === 'unstake')
+    const claimAllocations = changeQuoteAllocations.filter(alloc => alloc.allocationType === 'claim')
 
     return (
       <View style={styles.amountTilesContainer}>
         <EdgeCard icon={getCurrencyIconUris(wallet.currencyInfo.pluginId, null).symbolImage}>
           <EdgeRow title={lstrings.wc_smartcontract_wallet} body={getWalletName(wallet)} />
         </EdgeCard>
-        {
-          // Render stake/unstake amount tiles
-          modification === 'stake' || modification === 'unstake'
-            ? stakePolicy.stakeAssets.map(asset => renderEditableQuoteAmountRow(modification, asset))
-            : null
-        }
-        {
-          // Render claim amount tile
-          stakePolicy.hideClaimAction || (modification !== 'claim' && modification !== 'unstake')
-            ? null
-            : stakePolicy.rewardAssets.map(asset => renderEditableQuoteAmountRow('claim', asset))
-        }
+        {/* Editable rows are not show for liquid-staking policies */}
+        {stakePolicy.isLiquidStaking !== true ? stakeUnstakeAllocations.map(renderEditableQuoteAmountRow) : null}
+        {claimAllocations.map(renderEditableQuoteAmountRow)}
         {
           // Render stake/unstake fee tiles
           stakePolicy.stakeAssets.map(asset => renderStakeFeeAmountRow(modification, asset))
@@ -480,6 +495,10 @@ const StakeModifySceneComponent = (props: Props) => {
           stakePolicy.stakeAssets.map(asset => renderFutureUnstakeFeeAmountRow(modification, asset))
         }
         {quoteInfo?.breakEvenDays != null ? renderBreakEvenDays() : null}
+        {/* A warning card is show for liquid-staking policies, informing the user that staking is all-or-nothing. */}
+        {stakePolicy.isLiquidStaking === true && (modification === 'stake' || modification === 'unstake') ? (
+          <WarningCard title={lstrings.stake_liquid_staking_warning_title} header={sprintf(lstrings.stake_liquid_staking_warning_header, modification)} />
+        ) : null}
         {errorMessage === '' || sliderLocked ? null : <ErrorTile message={errorMessage} />}
       </View>
     )

@@ -25,11 +25,11 @@ import { BorrowEngine, BorrowPlugin } from '../../../plugins/borrow-plugins/type
 import { convertCurrency } from '../../../selectors/WalletSelectors'
 import { config } from '../../../theme/appConfig'
 import { useSelector } from '../../../types/reactRedux'
-import { EdgeSceneProps } from '../../../types/routerTypes'
+import { EdgeAppSceneProps, NavigationBase } from '../../../types/routerTypes'
 import { getWalletPickerExcludeWalletIds } from '../../../util/borrowUtils'
 import { getBorrowPluginIconUri } from '../../../util/CdnUris'
-import { getTokenId, getTokenIdForced } from '../../../util/CurrencyInfoHelpers'
-import { enableToken } from '../../../util/CurrencyWalletHelpers'
+import { getCurrencyCode, getTokenId, getTokenIdForced } from '../../../util/CurrencyInfoHelpers'
+import { enableTokenCurrencyCode } from '../../../util/CurrencyWalletHelpers'
 import { DECIMAL_PRECISION, removeIsoPrefix, truncateDecimals, zeroString } from '../../../util/utils'
 import { EdgeCard } from '../../cards/EdgeCard'
 import { FiatAmountInputCard } from '../../cards/FiatAmountInputCard'
@@ -52,7 +52,7 @@ export interface LoanCreateParams {
   borrowPlugin: BorrowPlugin
 }
 
-interface Props extends EdgeSceneProps<'loanCreate'> {}
+interface Props extends EdgeAppSceneProps<'loanCreate'> {}
 
 export const LoanCreateScene = (props: Props) => {
   const { navigation, route } = props
@@ -67,8 +67,8 @@ export const LoanCreateScene = (props: Props) => {
   // Force enable tokens required for loan
   useAsyncEffect(
     async () => {
-      await enableToken('WBTC', borrowEngineWallet)
-      await enableToken('USDC', borrowEngineWallet)
+      await enableTokenCurrencyCode('WBTC', borrowEngineWallet)
+      await enableTokenCurrencyCode('USDC', borrowEngineWallet)
     },
     [],
     'LoanCreateScene:1'
@@ -265,7 +265,7 @@ export const LoanCreateScene = (props: Props) => {
     Airship.show((bridge: AirshipBridge<WalletListResult>) => (
       <WalletListModal
         bridge={bridge}
-        navigation={navigation}
+        navigation={navigation as NavigationBase}
         headerTitle={lstrings.select_wallet}
         showCreateWallet
         createWalletId={!isSrc ? borrowEngineWallet.id : undefined}
@@ -291,12 +291,12 @@ export const LoanCreateScene = (props: Props) => {
           setDestWallet(borrowEngineWallet)
           setDestTokenId(hardDestTokenAddr)
         } else if (result?.type === 'wallet') {
-          const { walletId, currencyCode, tokenId } = result
+          const { walletId, tokenId } = result
           const selectedWallet = wallets[walletId]
           if (isSrc) {
             setSrcWalletId(walletId)
             setSrcTokenId(tokenId)
-            setSrcCurrencyCode(currencyCode)
+            setSrcCurrencyCode(getCurrencyCode(selectedWallet, tokenId))
           } else {
             setDestBankId(undefined)
             setDestWallet(selectedWallet)

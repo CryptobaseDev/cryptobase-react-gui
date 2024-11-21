@@ -11,13 +11,11 @@ import { CcWalletMap } from '../reducers/FioReducer'
 import { PermissionsState } from '../reducers/PermissionsReducer'
 import { AccountInitPayload, SettingsState } from '../reducers/scenes/SettingsReducer'
 import { TweakSource } from '../util/ReferralHelpers'
-import { DeepLink } from './DeepLinkTypes'
 import { AccountReferral, DeviceReferral, Promotion, ReferralCache } from './ReferralTypes'
 import { FioAddress, FioDomain, GuiContact, GuiExchangeRates, MostRecentWallet, SpendingLimits, WalletListItem } from './types'
 
 // Actions with no payload:
 type NoDataActionName =
-  | 'DEEP_LINK_HANDLED'
   | 'DEVELOPER_MODE_OFF'
   | 'DEVELOPER_MODE_ON'
   | 'DUMMY_ACTION_PLEASE_IGNORE'
@@ -50,7 +48,6 @@ export type Action =
       type: 'CORE/DISMISS_NEW_TOKENS'
       data: { walletId: string }
     }
-  | { type: 'DEEP_LINK_RECEIVED'; data: DeepLink }
   | { type: 'DEVICE_REFERRAL_LOADED'; data: DeviceReferral }
   | { type: 'EXCHANGE_RATES/UPDATE_EXCHANGE_RATES'; data: { exchangeRates: GuiExchangeRates } }
   | { type: 'IS_NOTIFICATION_VIEW_ACTIVE'; data: { isNotificationViewActive: boolean } }
@@ -70,7 +67,7 @@ export type Action =
   | { type: 'UI/SETTINGS/CHANGE_TOUCH_ID_SETTINGS'; data: { isTouchEnabled: boolean } }
   | { type: 'UI/SETTINGS/SET_ACCOUNT_BALANCE_VISIBILITY'; data: { isAccountBalanceVisible: boolean } }
   | { type: 'UI/SETTINGS/SET_AUTO_LOGOUT_TIME'; data: { autoLogoutTimeInSeconds: number } }
-  | { type: 'UI/SETTINGS/SET_CONTACTS_PERMISSION'; data: { contactsPermissionOn: boolean } }
+  | { type: 'UI/SETTINGS/SET_CONTACTS_PERMISSION_SHOWN'; data: { contactsPermissionShown: boolean } }
   | { type: 'UI/SETTINGS/SET_DEFAULT_FIAT'; data: { defaultFiat: string } }
   | { type: 'UI/SETTINGS/SET_DENOMINATION_KEY'; data: { pluginId: string; currencyCode: string; denomination: EdgeDenomination } }
   | { type: 'UI/SETTINGS/SET_MOST_RECENT_WALLETS'; data: { mostRecentWallets: MostRecentWallet[] } }

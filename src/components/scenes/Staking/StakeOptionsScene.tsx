@@ -4,12 +4,14 @@ import { View } from 'react-native'
 import { FlatList } from 'react-native-gesture-handler'
 import { sprintf } from 'sprintf-js'
 
+import { getFirstOpenInfo } from '../../../actions/FirstOpenActions'
 import { SCROLL_INDICATOR_INSET_FIX } from '../../../constants/constantSettings'
+import { useAsyncEffect } from '../../../hooks/useAsyncEffect'
 import { useIconColor } from '../../../hooks/useIconColor'
 import { lstrings } from '../../../locales/strings'
 import { StakePlugin, StakePolicy, StakePositionMap } from '../../../plugins/stake-plugins/types'
 import { useSelector } from '../../../types/reactRedux'
-import { EdgeSceneProps } from '../../../types/routerTypes'
+import { EdgeAppSceneProps } from '../../../types/routerTypes'
 import { getTokenIdForced } from '../../../util/CurrencyInfoHelpers'
 import { getPluginFromPolicy, getPolicyAssetName, getPolicyIconUris, getPolicyTitleName } from '../../../util/stakeUtils'
 import { darkenHexColor } from '../../../util/utils'
@@ -23,7 +25,7 @@ import { cacheStyles, Theme, useTheme } from '../../services/ThemeContext'
 import { EdgeText } from '../../themed/EdgeText'
 import { SceneHeader } from '../../themed/SceneHeader'
 
-interface Props extends EdgeSceneProps<'stakeOptions'> {
+interface Props extends EdgeAppSceneProps<'stakeOptions'> {
   wallet: EdgeCurrencyWallet
 }
 
@@ -46,13 +48,23 @@ const StakeOptionsSceneComponent = (props: Props) => {
   const tokenId = pluginId ? getTokenIdForced(account, pluginId, currencyCode) : null
   const iconColor = useIconColor({ pluginId, tokenId })
 
+  const [countryCode, setCountryCode] = React.useState<string | undefined>()
+
+  useAsyncEffect(
+    async () => {
+      setCountryCode((await getFirstOpenInfo()).countryCode)
+    },
+    [],
+    'StakeOptionsSceneComponent'
+  )
+
   //
   // Handlers
   //
 
   const handleStakeOptionPress = (stakePolicy: StakePolicy) => {
     const { stakePolicyId } = stakePolicy
-    const stakePlugin = getPluginFromPolicy(stakePlugins, stakePolicy)
+    const stakePlugin = getPluginFromPolicy(stakePlugins, stakePolicy, { pluginId })
     // Transition to next scene immediately
     const stakePosition = stakePositionMap[stakePolicyId]
     if (stakePlugin != null) navigation.push('stakeOverview', { stakePlugin, walletId: wallet.id, stakePolicy: stakePolicy, stakePosition })
@@ -64,13 +76,14 @@ const StakeOptionsSceneComponent = (props: Props) => {
 
   const renderOptions = ({ item }: { item: StakePolicy }) => {
     const primaryText = getPolicyAssetName(item, 'stakeAssets')
-    const secondaryText = getPolicyTitleName(item)
+    const secondaryText = getPolicyTitleName(item, countryCode)
     const key = [primaryText, secondaryText].join()
     const policyIcons = getPolicyIconUris(wallet.currencyInfo, item)
     return (
       <View key={key} style={styles.optionContainer}>
         <EdgeTouchableOpacity onPress={() => handleStakeOptionPress(item)}>
           <StakingOptionCard
+            apy={item.apy}
             currencyLogos={policyIcons.stakeAssetUris}
             primaryText={primaryText}
             secondaryText={secondaryText}

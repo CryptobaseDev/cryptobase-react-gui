@@ -1,5 +1,5 @@
-import { gt, lt } from 'biggystring'
-import { asArray, asBoolean, asNumber, asObject, asOptional, asString, asValue } from 'cleaners'
+import { gt, lt, round } from 'biggystring'
+import { asArray, asBoolean, asMaybe, asNumber, asObject, asOptional, asString, asValue } from 'cleaners'
 import { EdgeAssetAction, EdgeSpendInfo, EdgeTokenId, EdgeTxActionFiat } from 'edge-core-js'
 import URL from 'url-parse'
 
@@ -69,7 +69,7 @@ const CHAIN_ID_TO_PLUGIN_MAP: { [chainId: string]: string } = Object.entries(PLU
 
 const SUPPORTED_REGIONS: FiatProviderExactRegions = {
   US: {
-    notStateProvinces: ['FL', 'NY', 'TX']
+    notStateProvinces: ['FL', 'LA', 'NY', 'TX']
   }
 }
 
@@ -85,8 +85,8 @@ const allowedPaymentTypes: AllowedPaymentTypes = {
   }
 }
 
-const allowedBuyCurrencyCodes: FiatProviderAssetMap = { providerId, requiredAmountType: 'fiat', crypto: {}, fiat: {} }
-const allowedSellCurrencyCodes: FiatProviderAssetMap = { providerId, requiredAmountType: 'crypto', crypto: {}, fiat: {} }
+const allowedBuyCurrencyCodes: FiatProviderAssetMap = { providerId, crypto: {}, fiat: {} }
+const allowedSellCurrencyCodes: FiatProviderAssetMap = { providerId, crypto: {}, fiat: {} }
 const allowedCountryCodes: { [code: string]: boolean } = { US: true }
 
 /**
@@ -190,10 +190,10 @@ const asBlockchains = asObject({
  */
 
 // Define cleaners for nested objects and properties
-// const asAmountCurrency = asObject({
-//   amount: asNumber,
-//   currency: asString
-// })
+const asAmountCurrency = asObject({
+  amount: asNumber,
+  currency: asString
+})
 
 // const asRequest = asObject({
 //   transactionType: asValue('buy', 'sell'),
@@ -219,14 +219,14 @@ const asMinMaxValue = asObject({
 
 const asQuote = asObject({
   // asset: asString,
-  // baseAmount: asAmountCurrency,
+  baseAmount: asAmountCurrency,
   // pricePerUnit: asNumber,
   // price: asPrice,
   // processingFee: asAmountCurrency,
   // bridgeFee: asAmountCurrency,
   // networkFee: asAmountCurrency,
   // smartContractFee: asAmountCurrency,
-  // totalFee: asAmountCurrency,
+  totalFee: asAmountCurrency,
   // receiveAmountAfterFees: asAmountCurrency,
   // receiveUnitCountAfterFees: asAmountCurrency,
   receive: asObject({
@@ -383,7 +383,12 @@ const asOrderData = asObject({
   // settlementTimeInSeconds: asNumber
 })
 
-const asWebviewMessage = asObject({ type: asValue('PLAID_NEW_ACH_LINK'), payload: asObject({ link: asString }) })
+const asWebviewMessage = asObject({
+  // We also see "RAMP_ORDER_ID" here, so we should eventually add
+  // some `asEither` logic to switch between various valid message types:
+  type: asValue('PLAID_NEW_ACH_LINK' as const),
+  payload: asObject({ link: asString })
+})
 
 const asOrderInfo = asObject({
   success: asBoolean,
@@ -397,11 +402,13 @@ interface GetQuoteParams {
   amount: number
   blockchain: string
   currency: string
+  reverse: boolean
   asset: string
 }
 
 interface WidgetParams {
   apiKey: string
+  hideDepositDetails: boolean
   isMobileWebview: true
   mode: 'minimal'
   network: string
@@ -505,12 +512,6 @@ export const kadoProvider: FiatProviderFactory = {
         const allowedCurrencyCodes = direction === 'buy' ? allowedBuyCurrencyCodes : allowedSellCurrencyCodes
 
         if (!allowedCountryCodes[regionCode.countryCode]) throw new FiatProviderError({ providerId, errorType: 'regionRestricted', displayCurrencyCode })
-        if (direction === 'buy' && amountType !== 'fiat') {
-          throw new FiatProviderError({ providerId, errorType: 'assetUnsupported' })
-        }
-        if (direction === 'sell' && amountType !== 'crypto') {
-          throw new FiatProviderError({ providerId, errorType: 'assetUnsupported' })
-        }
         if (!paymentTypes.some(paymentType => allowedPaymentTypes[direction][paymentType] === true))
           throw new FiatProviderError({ providerId, errorType: 'paymentUnsupported' })
 
@@ -533,12 +534,15 @@ export const kadoProvider: FiatProviderFactory = {
           throw new FiatProviderError({ providerId, errorType: 'paymentUnsupported' })
         }
 
+        const reverse = (direction === 'sell' && amountType === 'fiat') || (direction === 'buy' && amountType === 'crypto')
+
         const queryParams: GetQuoteParams = {
           transactionType: direction,
           fiatMethod,
           amount: Number(exchangeAmount),
           blockchain,
           currency: 'USD',
+          reverse,
           asset
         }
 
@@ -561,17 +565,31 @@ export const kadoProvider: FiatProviderFactory = {
 
         const { amount: minAmount, unit: minUnit } = quote.data.quote.minValue
         const { amount: maxAmount, unit: maxUnit } = quote.data.quote.maxValue
+        const { baseAmount } = quote.data.quote
 
         let fiatAmount: string
         let cryptoAmount: string
+        const { totalFee } = quote.data.quote
+        const { amount, unitCount } = quote.data.quote.receive
         if (direction === 'buy') {
-          const { unitCount } = quote.data.quote.receive
-          cryptoAmount = unitCount.toString()
-          fiatAmount = exchangeAmount
+          if (amountType === 'fiat') {
+            cryptoAmount = unitCount.toString()
+            fiatAmount = exchangeAmount
+          } else {
+            // For some reason, the totalFee is not included in the fiatAmount on buy reverse quotes
+            fiatAmount = (amount + totalFee.amount).toString()
+            cryptoAmount = exchangeAmount
+          }
         } else {
-          const { amount } = quote.data.quote.receive
-          cryptoAmount = exchangeAmount
-          fiatAmount = amount.toString()
+          if (amountType === 'crypto') {
+            cryptoAmount = exchangeAmount
+            fiatAmount = amount.toString()
+          } else {
+            fiatAmount = exchangeAmount
+            // The unitCount is 0 for sell reverse quotes but seems to be in
+            // the baseAmount.amount so use that
+            cryptoAmount = baseAmount.amount.toString()
+          }
         }
         if (lt(fiatAmount, minAmount.toString()))
           throw new FiatProviderError({ providerId, errorType: 'underLimit', errorAmount: minAmount, displayCurrencyCode: minUnit })
@@ -600,6 +618,7 @@ export const kadoProvider: FiatProviderFactory = {
               const urlParams: WidgetParamsBuy = {
                 apiKey: apiKey,
                 fiatMethodList,
+                hideDepositDetails: true,
                 isMobileWebview: true,
                 network: blockchain,
                 networkList: blockchain,
@@ -616,6 +635,7 @@ export const kadoProvider: FiatProviderFactory = {
               const urlParams: WidgetParamsSell = {
                 apiKey: apiKey,
                 fiatMethodList,
+                hideDepositDetails: true,
                 isMobileWebview: true,
                 network: blockchain,
                 networkList: blockchain,
@@ -635,15 +655,10 @@ export const kadoProvider: FiatProviderFactory = {
             // webview to prevent some glitchiness. When needed, Kado will send an onMessage
             // trigger with the url to open. The below code is derived from Kado's sample code
             const onMessage = (data: string) => {
-              try {
-                datelog(`**** Kado onMessage ${data}`)
-                const message = asWebviewMessage(JSON.parse(data))
-                showUi.openExternalWebView({ url: message.payload.link, redirectExternal: true }).catch(e => {
-                  throw e
-                })
-              } catch (error) {
-                // Handle parsing errors gracefully
-                showUi.showError(`Error parsing message: ${String(error)}`).catch(e => {})
+              datelog(`**** Kado onMessage ${data}`)
+              const message = asMaybe(asWebviewMessage)(JSON.parse(data))
+              if (message?.type === 'PLAID_NEW_ACH_LINK') {
+                showUi.openExternalWebView({ url: message.payload.link, redirectExternal: true }).catch(async error => await showUi.showError(error))
               }
             }
 
@@ -747,7 +762,7 @@ export const kadoProvider: FiatProviderFactory = {
                       console.log(`  blockchain: ${blockchain}`)
                       console.log(`  pluginId: ${pluginId}`)
                       console.log(`  tokenId: ${tokenId}`)
-                      const nativeAmount = await coreWallet.denominationToNative(paymentExchangeAmount, displayCurrencyCode)
+                      const nativeAmount = round(await coreWallet.denominationToNative(paymentExchangeAmount, displayCurrencyCode), 0)
 
                       const assetAction: EdgeAssetAction = {
                         assetActionType: 'sell'
@@ -827,10 +842,10 @@ export const kadoProvider: FiatProviderFactory = {
                         }
                         await showUi.saveTxAction(params)
                       }
-                    } catch (e: any) {
-                      if (e.message === SendErrorNoTransaction) {
+                    } catch (e: unknown) {
+                      if (e instanceof Error && e.message === SendErrorNoTransaction) {
                         await showUi.showToast(lstrings.fiat_plugin_sell_failed_to_send_try_again)
-                      } else if (e.message === SendErrorBackPressed) {
+                      } else if (e instanceof Error && e.message === SendErrorBackPressed) {
                         await showUi.showToast(lstrings.fiat_plugin_sell_cancelled)
                         await showUi.exitScene()
                       } else {

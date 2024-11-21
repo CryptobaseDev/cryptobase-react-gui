@@ -4,11 +4,12 @@ import { Text } from 'react-native'
 import { SharedValue } from 'react-native-reanimated'
 
 import { checkAndShowLightBackupModal } from '../../actions/BackupModalActions'
+import { getFirstOpenInfo } from '../../actions/FirstOpenActions'
 import { selectWalletToken } from '../../actions/WalletActions'
 import { Fontello } from '../../assets/vector/index'
 import { useHandler } from '../../hooks/useHandler'
 import { useDispatch, useSelector } from '../../types/reactRedux'
-import { NavigationProp } from '../../types/routerTypes'
+import { NavigationBase, WalletsTabSceneProps } from '../../types/routerTypes'
 import { EdgeTouchableOpacity } from '../common/EdgeTouchableOpacity'
 import { SwipeableRowIcon } from '../icons/SwipeableRowIcon'
 import { WalletListMenuModal } from '../modals/WalletListMenuModal'
@@ -18,7 +19,7 @@ import { SwipableRowRef, SwipeableRow } from '../themed/SwipeableRow'
 import { WalletListCurrencyRow } from '../themed/WalletListCurrencyRow'
 
 interface Props {
-  navigation: NavigationProp<'walletList'>
+  navigation: WalletsTabSceneProps<'walletList'>['navigation']
 
   token?: EdgeToken
   tokenId: EdgeTokenId
@@ -54,8 +55,8 @@ function WalletListSwipeableCurrencyRowComponent(props: Props) {
 
   const handleRequest = useHandler(() => {
     closeRow()
-    if (!checkAndShowLightBackupModal(account, navigation)) {
-      dispatch(selectWalletToken({ navigation, walletId: wallet.id, tokenId, alwaysActivate: true }))
+    if (!checkAndShowLightBackupModal(account, navigation as NavigationBase)) {
+      dispatch(selectWalletToken({ navigation: navigation as NavigationBase, walletId: wallet.id, tokenId, alwaysActivate: true }))
         .then(activated => {
           if (activated) {
             navigation.navigate('request', { tokenId, walletId: wallet.id })
@@ -67,10 +68,11 @@ function WalletListSwipeableCurrencyRowComponent(props: Props) {
 
   const handleSelect = useHandler(() => {
     closeRow()
-    dispatch(selectWalletToken({ navigation, walletId: wallet.id, tokenId, alwaysActivate: true }))
+    dispatch(selectWalletToken({ navigation: navigation as NavigationBase, walletId: wallet.id, tokenId, alwaysActivate: true }))
       .then(async activated => {
+        const { countryCode } = await getFirstOpenInfo()
         if (activated) {
-          navigation.navigate('transactionList', { tokenId, walletId: wallet.id, walletName: wallet.name ?? wallet.currencyInfo.displayName })
+          navigation.navigate('transactionList', { tokenId, walletId: wallet.id, walletName: wallet.name ?? wallet.currencyInfo.displayName, countryCode })
         }
       })
       .catch(err => showError(err))
@@ -78,7 +80,7 @@ function WalletListSwipeableCurrencyRowComponent(props: Props) {
 
   const handleSend = useHandler(() => {
     closeRow()
-    dispatch(selectWalletToken({ navigation, walletId: wallet.id, tokenId, alwaysActivate: true }))
+    dispatch(selectWalletToken({ navigation: navigation as NavigationBase, walletId: wallet.id, tokenId, alwaysActivate: true }))
       .then(activated => {
         if (activated) {
           navigation.navigate('send2', {

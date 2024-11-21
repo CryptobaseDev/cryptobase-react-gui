@@ -100,6 +100,8 @@ const strings = {
   error_paymentprotocol_no_payment_option: 'No currencies available for this Payment Protocol invoice. Accepted currencies: %s',
   error_paymentprotocol_tx_verification_failed: 'Payment Protocol transaction verification mismatch',
   error_spend_amount_less_then_min_s: 'Spend amount is less than minimum of %s',
+  error_amount_too_low_to_stake_s: 'The amount %s is too low to stake successfully',
+  error_balance_below_minimum_to_stake_2s: 'Your balance of %1$s does not meet the minimum %2$s required to stake.',
 
   // Warning messages:
   warning_low_fee_selected: 'Low Fee Selected',
@@ -122,9 +124,8 @@ const strings = {
 
   warning_token_code_override_2s:
     'The entered contract address differs from the contract address of built-in token %1$s. Please proceed with caution and verify the contract is legitimate as use of this token can result in loss of funds. If you have questions about this feature or contract please contact %2$s.',
-  warning_token_contract_override_3s:
-    'The entered token %1$s exists as a built-in token %2$s with the same contract address. Please proceed with caution and verify the contract is legitimate as use of this token can result in loss of funds. If you have questions about this feature please contact %3$s.',
   warning_token_exists_1s: 'The entered token already exists as a built-in token %1$s',
+  warning_battery_saver: `Battery Saver Detected! Balances may not update. For the best experience, please turn off battery saver mode.`,
 
   // Alert component:
   alert_dropdown_alert: 'Alert! ',
@@ -146,16 +147,13 @@ const strings = {
 
   max_spend_unavailable_modal_title: 'Max Spend Unavailable',
   max_spend_unavailable_modal_message: 'Unable to calculate maximum spendable amount for currency %s. Please enter amount.',
-  access_wallet_description:
-    'This application would like to create or access its wallet in your %1$s account.\n\n It will not have access to any other wallets.',
-  edge_description_warning:
-    'The "%1$s" application is requesting full access to your account and all wallets. \n\nOnly accept this login request if you trust this application and where it was downloaded from.',
+  access_wallet_description: `You have scanned a QR code to login to your account from another device. Accepting this login will grant full access to your account and funds on that other device.\n\nDO NOT accept this login unless you trust the application and person who provided the QR code`,
+  edge_description_warning: `You have scanned a QR code to login to your account from another device. Accepting this login will grant full access to your account and funds on that other device.\n\nDO NOT accept this login unless you trust the application and person who provided the QR code`,
   exchange_failed: 'Exchange Failed',
   exchange_congratulations: 'Congratulations!',
-  exchange_congratulations_msg: 'Your exchange has been successfully completed!',
-  exchange_congratulations_msg_info: 'Exchanges may take a few minutes and up to 24 hours to process.',
+  exchange_congratulations_success: 'Your exchange is being processed!',
+  exchange_congratulations_note: 'Processing may take up to 24 hours to complete.',
   no_exchange_amount: 'No Amount Selected',
-  exchange_asset_unsupported: '%s unsupported at this time. Please try again later.',
   select_exchange_amount: 'Please enter an amount to exchange',
   select_exchange_amount_short: 'Enter an Amount',
   fragment_wallets_addwallet_fiat_hint: 'Choose a fiat currency',
@@ -322,7 +320,6 @@ const strings = {
   activate_wallet_token_transaction_name_xrp: 'XRP Ledger',
   activate_wallet_token_transaction_notes_xrp: 'Activate XRP token by enabling Trust Line to issuer',
   activate_wallet_token_scene_title: 'Activate Token',
-  activate_wallet_tokens_scene_title: 'Activate Tokens',
   activate_wallet_token_scene_tile_title: 'Token to Activate',
   activate_wallet_tokens_scene_tile_title: 'Tokens to Activate',
   activate_wallet_token_scene_body:
@@ -402,7 +399,7 @@ const strings = {
   incorrect_pin: 'Incorrect PIN',
   invalid_spend_request: 'Invalid Spend Request',
   invalid_custom_fee: 'Minimum custom fee is',
-  missing_username: '<No username>',
+  guest_account_id_1s: 'Guest Account (%1$s)',
   settings_detect_tokens: 'Detect & Enable Tokens',
   settings_enable_detected_tokens_toast: 'Enabled detected tokens',
   settings_no_detected_tokens_toast: 'No balances found on disabled tokens',
@@ -435,6 +432,9 @@ const strings = {
   swap_options_header_centralized: 'Centralized\nMay require personal info',
   swap_preferred_instructions: 'When multiple exchanges can fill an order, prefer:',
   swap_preferred_promo_instructions: 'When multiple exchanges can fill an order, the current promotion always prefers:',
+  swap_token_no_enabled_exchanges_2s: 'No enabled exchanges support %1$s (on %2$s) at this time',
+  swap_minimum_receive_amount: 'Min Receive Amount',
+  swap_minimum_amount_1s: 'Min %1$s',
   settings_button_clear_logs: 'Clear Logs',
   settings_button_send_logs: 'Send Logs to Edge',
   settings_button_export_logs: 'Export Logs',
@@ -456,7 +456,8 @@ const strings = {
     'Edge uses Monero light wallet servers provided by MyMonero. These servers hold the private view key, which they use to scan for transactions. For enhanced privacy, you can run your own Monero light wallet server.',
   settings_hours: 'Hour(s)',
   settings_minutes: 'Minute(s)',
-  settings_modal_export_logs_message: 'You may add any additional notes here, and select whether to share logs with Edge, or export logs to your device.',
+  settings_modal_export_logs_warning: 'Do not enter seeds, private keys, password or other sensitive information',
+  settings_modal_export_logs_directions: 'Select whether to share logs with Edge or export logs to your device.',
   settings_modal_clear_logs_message: 'Are you sure you want to clear all logs on this device?',
   settings_modal_clear_logs_success: 'Logs have been cleared',
   settings_modal_send_logs_success: 'Logs have been sent',
@@ -497,8 +498,13 @@ const strings = {
   staking_change_unlock_explainer_title: 'Unstaked Funds',
   staking_change_unlock_explainer1: 'Unstaked funds are not immediately available. ',
   staking_change_unlock_explainer2: 'These continue to be locked and unusable for 7 days after you unstake the funds.',
+  staking_discover: 'Discover',
+  staking_earning_pools: 'Earning Pools',
+  staking_earn_crypto: 'Earn Crypto',
+  staking_earn_crypto_footer: 'Stake crypto for passive returns',
   staking_overview_header: 'Stake %s',
   staking_overview_explainer: 'You have the following funds staked:',
+  staking_portfolio: 'Portfolio',
   staking_locked_title: 'Unstaked and locked until %1$s',
   staking_stake_funds_button: 'Stake More Funds',
   staking_unstake_funds_button: 'Unstake',
@@ -522,6 +528,7 @@ const strings = {
   string_archive: 'Archive',
   string_archive_wallet: 'Archive Wallet',
   satPerByte: 'Satoshi Per Byte',
+  go_to_parent_wallet: 'Go to Parent Wallet',
   gasLimit: 'Gas Limit',
   gasPrice: 'Gas Price (Gwei)',
   string_disable: 'Disabled',
@@ -566,6 +573,7 @@ const strings = {
   string_first_coreum_wallet_name: 'My Coreum',
   string_first_cosmoshub_wallet_name: 'My Cosmos Hub',
   string_first_osmosis_wallet_name: 'My Osmosis',
+  string_first_ton_wallet_name: 'My Toncoin',
   string_first_thorchainrune_wallet_name: 'My Thorchain',
   string_first_rsk_wallet_name: 'My Rootstock',
   string_first_bnb_wallet_name: 'My BNB',
@@ -645,10 +653,10 @@ const strings = {
   title_edit_token: 'Edit Token',
   title_add_token: 'Add Token',
   title_password_recovery: 'Password Recovery',
-  title_plugin_buy_s: 'Buy %1$s',
+  transaction_details_bought_1s: 'Buy %1$s',
   title_select_region: 'Select Region',
   title_select_payment_method: 'Select Payment Method',
-  title_plugin_sell_s: 'Sell %1$s',
+  transaction_details_sold_1s: 'Sell %1$s',
   title_otp: '2-Factor Security',
   title_register_fio_address: 'Register FIO Address',
   title_register_fio_domain: 'Register FIO Domain',
@@ -669,6 +677,7 @@ const strings = {
   trade_currency: 'Trade',
   trade_s: 'Trade %1$s',
   swap_s_to_from_crypto: 'Swap %1$s to/from another crypto',
+  transaction_details: 'Transaction Details',
   transaction_details_category_title: 'Category',
   transaction_details_payee: 'Payee',
   transaction_details_payer: 'Payer',
@@ -822,11 +831,15 @@ const strings = {
 
   buy_crypto_modal_title: 'Wallet Empty',
   buy_crypto_modal_message: 'Your %s wallet is empty. Would you like to buy %s or exchange another crypto into %s?',
+  buy_crypto_modal_message_no_exchange_s: 'Your %s wallet is empty. Would you like to buy %s?',
   buy_parent_crypto_modal_message_2s: '%1$s%2$s is required to send this transaction. Would you like to buy %2$s or exchange another crypto into %2$s?',
   buy_parent_crypto_modal_message_3s:
     '%1$s%2$s (on %3$s) is required to send this transaction. Would you like to buy %2$s or exchange another crypto into %2$s?',
+  buy_parent_crypto_modal_message_no_exchange_2s: '%1$s%2$s is required to send this transaction. Would you like to buy %2$s?',
+  buy_parent_crypto_modal_message_no_exchange_3s: '%1$s%2$s (on %3$s) is required to send this transaction. Would you like to buy %2$s?',
   buy_crypto_decline: 'Not at this time',
-  buy_crypto_modal_buy_action: 'Buy %s',
+  buy_1s: 'Buy %1$s',
+  sell_1s: 'Sell %1$s',
   buy_crypto_modal_exchange: 'Exchange',
   exchange_crypto_modal_message: 'Your %s wallet is empty. Would you like to exchange another crypto into %s?',
   private_key_modal_sweep_from_private_address: 'Sweep Funds From Private Key',
@@ -842,10 +855,12 @@ const strings = {
   sweep_private_key_syncing_balances: 'Searching for balances...',
   sweep_private_key_syncing_balances_slow: 'Looking up balances is taking longer than usual.\nPlease wait...',
 
+  restore: 'Restore',
   restore_wallets_modal_title: 'Restore Wallets',
-  restore_wallets_modal_description: 'This will restore all deleted and archived wallets',
+  restore_wallets_modal_body: 'This will restore all selected wallets',
   restore_wallets_modal_confirm: 'Confirm',
   restore_wallets_modal_cancel: 'Cancel',
+  older_date: 'Older',
 
   memo_destination_tag_title: 'Destination Tag',
   memo_memo_title: 'Transaction Memo',
@@ -1120,10 +1135,7 @@ const strings = {
   price_change_buy_sell_trade: 'Would you like to buy, sell, or exchange %1$s?',
   // Update notices
   update_notice_deprecate_electrum_servers_title: 'Blockbook Upgrade',
-  update_notice_deprecate_electrum_servers_message:
-    '%s no longer uses Electrum Servers. If you would like to continue to use CUSTOM NODES, please input Blockbook compatible addresses.' +
-    '\n\n' +
-    'NOTE: If you had custom nodes enabled, those wallets will not sync until corrected.',
+  update_notice_deprecate_electrum_servers_message: `%s no longer uses Electrum Servers. If you would like to continue to use CUSTOM NODES, please input Blockbook compatible addresses.\n\nNOTE: If you had custom nodes enabled, those wallets will not sync until corrected.`,
 
   error_boundary_title: 'Oops!',
   error_boundary_message_s:
@@ -1131,6 +1143,7 @@ const strings = {
   error_boundary_message2: "If the problem persists, tap below to contact us, and we'll do our best to fix the problem.",
   error_boundary_help_button: 'Help Closing App',
   error_unexpected_title: 'Unexpected Error',
+  error_kyc_required_s: 'KYC required: %s',
 
   export_transaction_date_range: 'Date Range',
   export_transaction_export_type: 'Export Type',
@@ -1220,9 +1233,7 @@ const strings = {
   loan_breakdown_title: 'Loan Breakdown',
   loan_close_swap_warning:
     "Closing your loan will liquidate some of the deposited collateral if you do not have enough balance to repay the remaining principal and interest on your loan. The remaining collateral will be deposited back to your wallet.\n\nLiquidation most likely will incur a higer capital cost, if remaining principal isn't repaid.",
-  loan_close_loan_no_tx_needed_message:
-    `There appears to be no principal to repay nor collateral to withdraw.\n\n` +
-    `No transactions are required to close your account, however the account may re-appear after closing if there are pending on-chain transactions.`,
+  loan_close_loan_no_tx_needed_message: `There appears to be no principal to repay nor collateral to withdraw.\n\nNo transactions are required to close your account, however the account may re-appear after closing if there are pending on-chain transactions.`,
   loan_close_loan_title: 'Close Loan',
   loan_close_multiple_asset_error:
     'Closing loans with multiple debt assets and/or deposited collateral assets is not supported.\n\nPlease specify funding sources to repay loans with using Repay.',
@@ -1368,6 +1379,16 @@ const strings = {
 
   // Stake
   stake_estimated_return: 'Estimated Return: %s',
+  stake_estimated_apr_s: '%s Estimated APR',
+  stake_stake_1s: 'Stake: %1$s',
+  stake_staked_1s: 'Staked: %1$s',
+  stake_earn_1s: 'Earn: %1$s',
+  stake_earning_1s: 'Earning: %1$s',
+
+  stake_apy_1s: '%1$s APY',
+  stake_stable_apy: 'Stable APY',
+  stake_variable_apy: 'Variable APY',
+
   stake_s_staked: '%s Staked',
   stake_s_earned: '%s Earned',
   stake_s_unstaked: '%s Unstaked',
@@ -1413,6 +1434,8 @@ const strings = {
   stake_break_even_days_months_s: '%1$s days (%2$s months)',
   stake_earn_button_label: 'Earn',
   stake_unable_to_query_locked: 'Unable to query locked balance. Please try again later.',
+  stake_liquid_staking_warning_title: 'Liquid Staking Pool Notice',
+  stake_liquid_staking_warning_header: `This is a liquid-staking pool, meaning the entire wallet's balance is either staked/unstaked in the pool. Wallet funds will remain liquid (transferable), however all current and future funds will be exposed to the risks and rewards of the staking pool while staked.`,
 
   // Tron resource staking
   stake_resource_display_name: 'TRON Resources',
@@ -1422,8 +1445,6 @@ const strings = {
 
   fiat_plugin_select_asset_to_purchase: 'Select Asset to Purchase',
   fiat_plugin_select_asset_to_sell: 'Select Asset to Sell',
-  fiat_plugin_buy_currencycode: 'Buy %s', // TODO: string key convention
-  fiat_plugin_sell_currencycode_s: 'Sell %s',
   fiat_plugin_sell_network_fee: 'Sell Network Fee',
   fiat_plugin_amount_currencycode: 'Amount %s',
   fiat_plugin_buy_amount_over_limit: 'Max purchase amount is %s',
@@ -1443,10 +1464,20 @@ const strings = {
   fiat_plugin_fetching_assets: 'Fetching supported assets',
   fiat_plugin_sell_cancelled: 'Sell order cancelled',
   fiat_plugin_finalizing_quote: 'Finalizing your exchange quote. Please wait as this may take up to a minute',
+  fiat_plugin_buy_complete_title: 'Buy Order Complete',
+  fiat_plugin_buy_complete_message_s: 'Your buy order of %1$s %2$s with %3$s %4$s has been completed.',
+  fiat_plugin_buy_complete_message_2_hour_s: 'Please allow up to %1$s hour for the funds to appear in your wallet.',
+  fiat_plugin_buy_complete_message_2_hours_s: 'Please allow up to %1$s hours for the funds to appear in your wallet.',
+  fiat_plugin_buy_failed_try_again: 'Buy order failed. Please try again',
+  fiat_plugin_sell_complete_title: 'Sell Order Complete',
+  fiat_plugin_sell_complete_message_s: 'Your sell order of %1$s %2$s for %3$s %4$s has been completed.',
+  fiat_plugin_sell_complete_message_2_hour_s: 'Please allow up to %1$s hour for the funds to appear in your account.',
+  fiat_plugin_sell_complete_message_2_hours_s: 'Please allow up to %1$s hours for the funds to appear in your account.',
+  fiat_plugin_sell_complete_message_3: 'A confirmation email has been sent to your registered email address.',
   fiat_plugin_sell_failed_try_again: 'Sell order failed. Please try again.',
   fiat_plugin_sell_failed_to_send_try_again: 'Failed to send funds for sell transaction. Please try again.',
   fiat_plugin_cannot_continue_camera_permission: 'Cannot continue. Camera permission needed for ID verifications',
-  fiat_plugin_purchase_limit_error: 'Please back up your account to increase the purchase limit',
+  fiat_plugin_purchase_limit_error_2s: 'Please create a full account to increase the purchase limit above %1$s %2$s',
   fiat_plugin_max_buy_quote_error: 'Provider cannot create max buy quote',
   fiat_plugin_max_sell_quote_error: 'Provider cannot create max sell quote',
   fiat_plugin_max_sell_quote_error_1s: 'Cannot create max sell quote for %1$s',
@@ -1524,21 +1555,21 @@ const strings = {
   backup_account: 'Back Up Account',
   backup_delete_confirm_message:
     'Are you sure you want to delete this account without backing up first? You will NOT be able to recover wallets and transactions for this account!',
-  backup_info_message: 'Create a username and password to securely encrypt and back up your account',
-  backup_dismiss_button: 'Continue Without a Backup',
+  backup_info_message: 'Create a username and password to create a full account and secure your funds. No personal information is required',
+  backup_dismiss_button: 'Continue with Guest Account',
   backup_warning_message: 'Without a backup, you risk losing your funds!',
   backup_web3_handle_warning_message: 'Without a backup, you risk losing your web3 handle!',
   tap_to_learn_more: 'Tap to learn more.',
   backup_for_transfer_message:
-    'To buy, sell, and receive funds, please back up your account. Edge encrypted backups use a familiar username and password method that will safeguard your assets and help prevent loss of funds.\n\nNever share your username and password, and store your credentials securely!',
+    'To buy, sell, and receive funds, please create a full account. %1$s full accounts require no personal information and use a familiar username and password method that will safeguard your assets and help prevent loss of funds.\n\nNever share your username and password, and store your credentials securely!',
 
-  guest_account: 'Guest Account',
-  tap_to_create_username_password: 'Tap to create a username and password',
+  backup_notification_title: 'Create Username & Password',
+  backup_notification_body: 'Funds will be lost if your device is lost or %1$s is uninstalled.',
 
   // Backup Message Variants
-  backup_title: 'Back Up Your Account',
+  backup_title: 'Create Full Account',
   backup_message: 'Create a username and password to continue.',
-  backup_message_subtext: 'Backing up your account ensures you can safely recover your funds in the event that you lose access to your device.',
+  backup_message_subtext: 'Creating a full account ensures you can safely recover your funds in the event that you lose access to your device.',
 
   no_access_disclaimer_1s: '%1$s has zero access to user funds and does not see or store any private keys or personal information.',
 
@@ -1569,6 +1600,7 @@ const strings = {
   survey_opt_in_person_event: 'In-person Event',
   survey_opt_personal_referral: 'Personal Referral',
   survey_opt_article: 'Article',
+  survey_opt_BTCTKVR_magazine: 'BTCTKVR Magazine',
   survey_opt_submit: 'Submit',
   survey_opt_dismiss: 'Dismiss',
   survey_opt_other_specify: 'Other (Specify)',
@@ -1599,13 +1631,22 @@ const strings = {
   fio_web3: 'Web3 Handle',
   fio_web3_footer: 'Manage your handles and domains',
   title_home: 'Home',
-  title_learn: 'Learn',
+  edgeucation_articles: 'Edge-ucation Articles',
+  edgeucation_videos: 'Edge-ucation Videos',
   view_assets: 'View Assets',
   title_support: 'Need Support?',
   body_support: 'Contact our team of experts to troubleshoot your crypto needs',
   button_support: 'Contact Support',
 
   // #endregion Home
+
+  // #region UK Compliance
+
+  uk_ways_to_buy_1s: 'Ways to Buy %1$s',
+  uk_ways_to_sell_1s: 'Ways to Sell %1$s',
+  uk_get_quote_provider_1s: 'Get %1$s Quote from 3rd Party Provider',
+
+  // #endregion UK Compliance
 
   redacted_placeholder: '●●●●',
   insufficient_funds_2s: 'Insufficient %1$s (%2$s).',
@@ -1855,7 +1896,7 @@ const strings = {
 
   auto_log_off_failed_message_s: 'Failed to auto-logoff: %s',
   contacts_load_failed_message_s: 'Failed to load contacts: %s'
-}
+} as const
 
 // eslint-disable-next-line import/no-default-export
 export default strings

@@ -18,7 +18,7 @@ import { AccountInitPayload, initialState } from '../reducers/scenes/SettingsRed
 import { WalletCreateItem } from '../selectors/getCreateWalletList'
 import { config } from '../theme/appConfig'
 import { Dispatch, ThunkAction } from '../types/reduxTypes'
-import { NavigationBase, NavigationProp } from '../types/routerTypes'
+import { EdgeAppSceneProps, NavigationBase } from '../types/routerTypes'
 import { currencyCodesToEdgeAssets } from '../util/CurrencyInfoHelpers'
 import { logActivity } from '../util/logger'
 import { logEvent, trackError } from '../util/tracking'
@@ -85,8 +85,11 @@ export function initializeAccount(navigation: NavigationBase, account: EdgeAccou
       // during account creation
       await readLocalAccountSettings(account)
 
-      const newAccountFlow = async (navigation: NavigationProp<'createWalletSelectCrypto'>, items: WalletCreateItem[]) => {
-        navigation.replace('edgeTabs', { screen: 'homeTab', params: { screen: 'home' } })
+      const newAccountFlow = async (
+        navigation: EdgeAppSceneProps<'createWalletSelectCrypto' | 'createWalletSelectCryptoNewAccount'>['navigation'],
+        items: WalletCreateItem[]
+      ) => {
+        navigation.replace('edgeTabs', { screen: 'home' })
         const createWalletsPromise = createCustomWallets(account, fiatCurrencyCode, items, dispatch).catch(error => showError(error))
 
         // New user FIO handle registration flow (if env is properly configured)
@@ -107,13 +110,23 @@ export function initializeAccount(navigation: NavigationBase, account: EdgeAccou
         screen: 'edgeAppStack',
         params: {
           screen: 'createWalletSelectCryptoNewAccount',
-          params: { newAccountFlow, defaultSelection }
+          params: {
+            newAccountFlow,
+            defaultSelection,
+            disableLegacy: true
+          }
         }
       })
 
       performance.mark('loginEnd', { detail: { isNewAccount: newAccount } })
     } else {
-      rootNavigation.replace('edgeApp', {})
+      rootNavigation.replace('edgeApp', {
+        screen: 'edgeAppStack',
+        params: {
+          screen: 'edgeTabs',
+          params: { screen: 'home' }
+        }
+      })
       referralPromise.catch(() => console.log(`Failed to load account referral info`))
 
       performance.mark('loginEnd', { detail: { isNewAccount: newAccount } })
@@ -156,7 +169,7 @@ export function initializeAccount(navigation: NavigationBase, account: EdgeAccou
 
     // Check for security alerts:
     if (hasSecurityAlerts(account)) {
-      navigation.push('securityAlerts', {})
+      navigation.push('securityAlerts')
       hideSurvey = true
     }
 
@@ -249,7 +262,8 @@ export function initializeAccount(navigation: NavigationBase, account: EdgeAccou
       showError(error)
     }
 
-    if (!newAccount && !hideSurvey && !getDeviceSettings().isSurveyDiscoverShown) {
+    // Post login stuff:
+    if (!newAccount && !hideSurvey && !getDeviceSettings().isSurveyDiscoverShown && config.disableSurveyModal !== true) {
       // Show the survey modal once per app install, only if this isn't the
       // first login of a newly created account and the user didn't get any
       // other modals or scene changes immediately after login.

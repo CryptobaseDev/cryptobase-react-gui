@@ -1,3 +1,4 @@
+import { abs, eq, gt, mul } from 'biggystring'
 import { asMaybeInsufficientFundsError, EdgeAccount, EdgeCurrencyWallet, EdgeParsedUri, EdgeSpendInfo, EdgeTokenId } from 'edge-core-js'
 import * as React from 'react'
 import { sprintf } from 'sprintf-js'
@@ -6,20 +7,23 @@ import URL from 'url-parse'
 import { ButtonsModal } from '../components/modals/ButtonsModal'
 import { ConfirmContinueModal } from '../components/modals/ConfirmContinueModal'
 import { WalletListModal, WalletListResult } from '../components/modals/WalletListModal'
-import { Airship, showError, showWarning } from '../components/services/AirshipInstance'
+import { Airship, showDevError, showError, showWarning } from '../components/services/AirshipInstance'
 import { getSpecialCurrencyInfo } from '../constants/WalletAndCurrencyConstants'
 import { lstrings } from '../locales/strings'
+import { getExchangeRate } from '../selectors/WalletSelectors'
 import { config } from '../theme/appConfig'
 import { RequestAddressLink } from '../types/DeepLinkTypes'
-import { Dispatch, ThunkAction } from '../types/reduxTypes'
+import { Dispatch, RootState, ThunkAction } from '../types/reduxTypes'
 import { NavigationBase } from '../types/routerTypes'
-import { getCurrencyCode, getWalletTokenId } from '../util/CurrencyInfoHelpers'
+import { getCurrencyCode } from '../util/CurrencyInfoHelpers'
 import { parseDeepLink } from '../util/DeepLinkParser'
 import { logActivity } from '../util/logger'
 import { makeCurrencyCodeTable, upgradeCurrencyCodes } from '../util/tokenIdTools'
+import { getUkCompliantString } from '../util/ukComplianceUtils'
 import { getPluginIdFromChainCode, toListString, zeroString } from '../util/utils'
 import { cleanQueryFlags, openBrowserUri } from '../util/WebUtils'
 import { checkAndShowLightBackupModal } from './BackupModalActions'
+import { getFirstOpenInfo } from './FirstOpenActions'
 
 /**
  * Handle Request for Address Links (WIP - pending refinement).
@@ -101,14 +105,13 @@ export const doRequestAddress = async (navigation: NavigationBase, account: Edge
       <WalletListModal bridge={bridge} navigation={navigation} headerTitle={lstrings.select_wallet} allowedAssets={edgeAssets} showCreateWallet />
     )).then(async result => {
       if (result?.type === 'wallet') {
-        const { walletId, currencyCode } = result
+        const { walletId, tokenId } = result
         const { currencyWallets } = account
         const wallet = currencyWallets[walletId]
-        const tokenId = getWalletTokenId(wallet, currencyCode)
 
         // TODO: Extend getReceiveAddress() to generate the full bitcion:XXXX address instead of using raw addresses here
         const { publicAddress } = await wallet.getReceiveAddress({ tokenId })
-        jsonPayloadMap[`${currencyWallets[walletId].currencyInfo.currencyCode}_${currencyCode}`] = publicAddress
+        jsonPayloadMap[`${currencyWallets[walletId].currencyInfo.currencyCode}_${getCurrencyCode(wallet, tokenId)}`] = publicAddress
       }
     })
   }
@@ -203,7 +206,7 @@ export function handleWalletUris(
 
       if (parsedUri.privateKeys != null && parsedUri.privateKeys.length > 0) {
         // PRIVATE KEY URI
-        return await privateKeyModalActivated(account, navigation, wallet, parsedUri.privateKeys)
+        return await privateKeyModalActivated(state, account, navigation, wallet, parsedUri.privateKeys)
       }
 
       // PUBLIC ADDRESS URI
@@ -239,7 +242,13 @@ export function handleWalletUris(
   }
 }
 
-async function privateKeyModalActivated(account: EdgeAccount, navigation: NavigationBase, wallet: EdgeCurrencyWallet, privateKeys: string[]): Promise<void> {
+async function privateKeyModalActivated(
+  state: RootState,
+  account: EdgeAccount,
+  navigation: NavigationBase,
+  wallet: EdgeCurrencyWallet,
+  privateKeys: string[]
+): Promise<void> {
   const message = sprintf(lstrings.private_key_modal_sweep_from_private_key_message, config.appName)
 
   await Airship.show<'confirm' | 'cancel' | undefined>(bridge => (
@@ -257,7 +266,7 @@ async function privateKeyModalActivated(account: EdgeAccount, navigation: Naviga
                 const memoryWalletPromise = account.makeMemoryWallet(wallet.type, { keys })
                 navigation.navigate('sweepPrivateKeyProcessing', { memoryWalletPromise, receivingWallet: wallet })
               } catch (e) {
-                await sweepPrivateKeys(account, navigation, wallet, privateKeys)
+                await sweepPrivateKeys(state, account, navigation, wallet, privateKeys)
               }
               return true
             }
@@ -269,15 +278,25 @@ async function privateKeyModalActivated(account: EdgeAccount, navigation: Naviga
   ))
 }
 
-async function sweepPrivateKeys(account: EdgeAccount, navigation: NavigationBase, wallet: EdgeCurrencyWallet, privateKeys: string[]) {
-  if (checkAndShowLightBackupModal(account, navigation)) return
-
+async function sweepPrivateKeys(state: RootState, account: EdgeAccount, navigation: NavigationBase, wallet: EdgeCurrencyWallet, privateKeys: string[]) {
   try {
     const unsignedTx = await wallet.sweepPrivateKeys({
       tokenId: null,
       privateKeys,
       spendTargets: []
     })
+
+    // Check for a $50 maximum sweep for light accounts:
+    const sendNativeAmount = abs(unsignedTx.nativeAmount)
+    const sendExchangeAmount = await wallet.nativeToDenomination(sendNativeAmount, wallet.currencyInfo.currencyCode)
+    const exchangeRate = getExchangeRate(state, wallet.currencyInfo.currencyCode, 'iso:USD')
+    const sweepAmountFiat = mul(sendExchangeAmount, exchangeRate)
+    if (eq(exchangeRate, '0') || gt(sweepAmountFiat, '50')) {
+      const modalShown = checkAndShowLightBackupModal(account, navigation)
+      if (modalShown) return
+    }
+
+    // Continue with sweep if above requirements met
     const signedTx = await wallet.signTx(unsignedTx)
     await wallet.broadcastTx(signedTx)
 
@@ -323,6 +342,7 @@ const shownWalletGetCryptoModals: string[] = []
 export function checkAndShowGetCryptoModal(navigation: NavigationBase, wallet: EdgeCurrencyWallet, tokenId: EdgeTokenId): ThunkAction<Promise<void>> {
   return async dispatch => {
     try {
+      const { countryCode } = await getFirstOpenInfo()
       const currencyCode = getCurrencyCode(wallet, tokenId)
       // check if balance is zero
       const balance = wallet.balanceMap.get(tokenId)
@@ -331,19 +351,34 @@ export function checkAndShowGetCryptoModal(navigation: NavigationBase, wallet: E
       let threeButtonModal
       const { displayBuyCrypto } = getSpecialCurrencyInfo(wallet.currencyInfo.pluginId)
       if (displayBuyCrypto) {
-        const messageSyntax = sprintf(lstrings.buy_crypto_modal_message, currencyCode, currencyCode, currencyCode)
-        threeButtonModal = await Airship.show<'buy' | 'exchange' | 'decline' | undefined>(bridge => (
-          <ButtonsModal
-            bridge={bridge}
-            title={lstrings.buy_crypto_modal_title}
-            message={messageSyntax}
-            buttons={{
-              buy: { label: sprintf(lstrings.buy_crypto_modal_buy_action, currencyCode) },
-              exchange: { label: lstrings.buy_crypto_modal_exchange, type: 'primary' },
-              decline: { label: lstrings.buy_crypto_decline }
-            }}
-          />
-        ))
+        if (config.disableSwaps === true) {
+          const messageSyntax = sprintf(lstrings.buy_crypto_modal_message_no_exchange_s, currencyCode, currencyCode)
+          threeButtonModal = await Airship.show<'buy' | 'decline' | undefined>(bridge => (
+            <ButtonsModal
+              bridge={bridge}
+              title={lstrings.buy_crypto_modal_title}
+              message={messageSyntax}
+              buttons={{
+                buy: { label: getUkCompliantString(countryCode, 'buy_1s', currencyCode) },
+                decline: { label: lstrings.buy_crypto_decline }
+              }}
+            />
+          ))
+        } else {
+          const messageSyntax = sprintf(lstrings.buy_crypto_modal_message, currencyCode, currencyCode, currencyCode)
+          threeButtonModal = await Airship.show<'buy' | 'exchange' | 'decline' | undefined>(bridge => (
+            <ButtonsModal
+              bridge={bridge}
+              title={lstrings.buy_crypto_modal_title}
+              message={messageSyntax}
+              buttons={{
+                buy: { label: getUkCompliantString(countryCode, 'buy_1s', currencyCode) },
+                exchange: { label: lstrings.buy_crypto_modal_exchange, type: 'primary' },
+                decline: { label: lstrings.buy_crypto_decline }
+              }}
+            />
+          ))
+        }
       } else {
         // if we're not targetting for buying, but rather exchange
         const messageSyntax = sprintf(lstrings.exchange_crypto_modal_message, currencyCode, currencyCode, currencyCode)
@@ -362,7 +397,11 @@ export function checkAndShowGetCryptoModal(navigation: NavigationBase, wallet: E
       if (threeButtonModal === 'buy') {
         navigation.navigate('buyTab', { screen: 'pluginListBuy' })
       } else if (threeButtonModal === 'exchange') {
-        navigation.navigate('swapTab', { screen: 'swapCreate', params: { toWalletId: wallet.id, toTokenId: tokenId } })
+        if (config.disableSwaps === true) {
+          showDevError('Swaps are disabled. Cannot navigate to exchange.')
+        } else {
+          navigation.navigate('swapTab', { screen: 'swapCreate', params: { toWalletId: wallet.id, toTokenId: tokenId } })
+        }
       }
     } catch (e: any) {
       // Don't bother the user with this error, but log it quietly:

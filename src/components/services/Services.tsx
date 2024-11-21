@@ -1,6 +1,9 @@
 import { asDate, asJSON, asObject, uncleaner } from 'cleaners'
 import { EdgeAccount } from 'edge-core-js'
 import * as React from 'react'
+import { Platform } from 'react-native'
+import { BatteryOptEnabled, RequestDisableOptimization } from 'react-native-battery-optimization-check'
+import { usePowerState } from 'react-native-device-info'
 
 import { updateExchangeInfo } from '../../actions/ExchangeInfoActions'
 import { refreshConnectedWallets } from '../../actions/FioActions'
@@ -11,6 +14,7 @@ import { ENV } from '../../env'
 import { useAsyncEffect } from '../../hooks/useAsyncEffect'
 import { useHandler } from '../../hooks/useHandler'
 import { useRefresher } from '../../hooks/useRefresher'
+import { lstrings } from '../../locales/strings'
 import { defaultAccount } from '../../reducers/CoreReducer'
 import { FooterAccordionEventService } from '../../state/SceneFooterState'
 import { useDispatch, useSelector } from '../../types/reactRedux'
@@ -18,12 +22,12 @@ import { NavigationBase } from '../../types/routerTypes'
 import { height, ratioHorizontal, ratioVertical, width } from '../../util/scaling'
 import { snooze } from '../../util/utils'
 import { FioCreateHandleModal } from '../modals/FioCreateHandleModal'
+import { AlertDropdown } from '../navigation/AlertDropdown'
 import { AccountCallbackManager } from './AccountCallbackManager'
 import { ActionQueueService } from './ActionQueueService'
-import { Airship } from './AirshipInstance'
+import { Airship, showDevError } from './AirshipInstance'
 import { AutoLogout } from './AutoLogout'
 import { ContactsLoader } from './ContactsLoader'
-import { DeepLinkingManager } from './DeepLinkingManager'
 import { EdgeContextCallbackManager } from './EdgeContextCallbackManager'
 import { FioService } from './FioService'
 import { LoanManagerService } from './LoanManagerService'
@@ -57,6 +61,7 @@ let isFioModalShown = false
 export function Services(props: Props) {
   const dispatch = useDispatch()
   const account = useSelector(state => (state.core.account !== defaultAccount ? state.core.account : undefined))
+  const powerState = usePowerState()
   const { navigation } = props
 
   // Show FIO handle modal for new accounts or existing accounts without a FIO wallet:
@@ -124,6 +129,29 @@ export function Services(props: Props) {
     'Services 2'
   )
 
+  useAsyncEffect(
+    async () => {
+      if (Platform.OS !== 'android' || !powerState.lowPowerMode) {
+        return
+      }
+
+      const batteryOptEnabled = await BatteryOptEnabled()
+      if (!batteryOptEnabled) {
+        return
+      }
+      console.warn('Battery saver mode enabled and battery optimization is disabled')
+      await Airship.show(bridge => {
+        const onPress = async () => {
+          await RequestDisableOptimization()
+          bridge.resolve()
+        }
+        return <AlertDropdown bridge={bridge} onPress={onPress} message={lstrings.warning_battery_saver} warning persistent />
+      }).catch(e => showDevError(e))
+    },
+    [powerState],
+    'Services 3'
+  )
+
   // Methods to call periodically
   useRefresher(
     async () => {
@@ -140,7 +168,6 @@ export function Services(props: Props) {
       {ENV.BETA_FEATURES ? <ActionQueueService /> : null}
       <AutoLogout />
       <ContactsLoader />
-      <DeepLinkingManager navigation={navigation} />
       {account == null ? null : <AccountCallbackManager account={account} navigation={navigation} />}
       {account == null ? null : <SortedWalletList account={account} />}
       <EdgeContextCallbackManager navigation={navigation} />

@@ -4,13 +4,16 @@ import { View } from 'react-native'
 import { updateWalletsSort } from '../../actions/WalletListActions'
 import { useBackButtonToast } from '../../hooks/useBackButtonToast'
 import { useHandler } from '../../hooks/useHandler'
+import { useWatch } from '../../hooks/useWatch'
 import { lstrings } from '../../locales/strings'
 import { FooterRender, useSceneFooterState } from '../../state/SceneFooterState'
 import { useDispatch, useSelector } from '../../types/reactRedux'
-import { EdgeSceneProps } from '../../types/routerTypes'
+import { NavigationBase, WalletsTabSceneProps } from '../../types/routerTypes'
 import { EdgeButton } from '../buttons/EdgeButton'
+import { SceneButtons } from '../buttons/SceneButtons'
 import { CrossFade } from '../common/CrossFade'
 import { SceneWrapper } from '../common/SceneWrapper'
+import { WalletListModal, WalletListResult } from '../modals/WalletListModal'
 import { SortOption, WalletListSortModal } from '../modals/WalletListSortModal'
 import { AccountSyncBar } from '../progress-indicators/AccountSyncBar'
 import { Airship, showError } from '../services/AirshipInstance'
@@ -21,7 +24,7 @@ import { WalletListHeader } from '../themed/WalletListHeader'
 import { WalletListSortable } from '../themed/WalletListSortable'
 import { WalletListSwipeable } from '../themed/WalletListSwipeable'
 
-interface Props extends EdgeSceneProps<'walletList'> {}
+interface Props extends WalletsTabSceneProps<'walletList'> {}
 
 export function WalletListScene(props: Props) {
   const { navigation } = props
@@ -35,6 +38,10 @@ export function WalletListScene(props: Props) {
   const [footerHeight, setFooterHeight] = React.useState<number | undefined>()
 
   const sortOption = useSelector(state => state.ui.settings.walletsSort)
+
+  const account = useSelector(state => state.core.account)
+  const allKeys = useWatch(account, 'allKeys')
+  const hasRestoreWallets = allKeys.filter(key => key.archived || key.deleted).length > 0
 
   const setKeepOpen = useSceneFooterState(state => state.setKeepOpen)
 
@@ -57,15 +64,6 @@ export function WalletListScene(props: Props) {
       .catch(error => showError(error))
   })
 
-  const handleRefresh = useHandler(() => {
-    setIsSearching(true)
-  })
-
-  const handleReset = useHandler(() => {
-    setSearchText('')
-    setIsSearching(false)
-  })
-
   const handleStartSearching = useHandler(() => {
     setIsSearching(true)
   })
@@ -84,6 +82,37 @@ export function WalletListScene(props: Props) {
     setSorting(false)
   })
 
+  const handlePressRestoreWallets = useHandler(() => {
+    navigation.navigate('walletRestore')
+  })
+
+  const tokenSupportingWalletIds = React.useMemo(() => {
+    const walletIds: string[] = []
+    for (const wallet of Object.values(account.currencyWallets)) {
+      if (Object.keys(wallet.currencyConfig.builtinTokens).length > 0) {
+        walletIds.push(wallet.id)
+      }
+    }
+    return walletIds
+  }, [account])
+
+  const handlePressAddEditToken = useHandler(async () => {
+    const walletListResult = await Airship.show<WalletListResult>(bridge => (
+      <WalletListModal
+        bridge={bridge}
+        navigation={props.navigation as NavigationBase}
+        headerTitle={lstrings.choose_custom_token_wallet}
+        allowedWalletIds={tokenSupportingWalletIds}
+      />
+    ))
+    if (walletListResult?.type === 'wallet') {
+      const { walletId } = walletListResult
+      navigation.navigate('editToken', {
+        walletId
+      })
+    }
+  })
+
   const handleFooterLayoutHeight = useHandler((height: number) => {
     setFooterHeight(height)
   })
@@ -93,8 +122,15 @@ export function WalletListScene(props: Props) {
   //
 
   const renderHeader = React.useMemo(() => {
-    return <WalletListHeader navigation={navigation} sorting={sorting} searching={isSearching} openSortModal={handleSort} />
+    return <WalletListHeader navigation={navigation as NavigationBase} sorting={sorting} searching={isSearching} openSortModal={handleSort} />
   }, [handleSort, navigation, isSearching, sorting])
+
+  const renderListFooter = React.useMemo(() => {
+    if (isSearching && tokenSupportingWalletIds.length > 0) {
+      return <SceneButtons secondary={{ label: lstrings.add_custom_token, onPress: handlePressAddEditToken }} />
+    }
+    return <SceneButtons secondary={{ label: lstrings.restore_wallets_modal_title, onPress: handlePressRestoreWallets }} />
+  }, [handlePressAddEditToken, handlePressRestoreWallets, tokenSupportingWalletIds, isSearching])
 
   const renderFooter: FooterRender = React.useCallback(
     sceneWrapperInfo => {
@@ -143,13 +179,11 @@ export function WalletListScene(props: Props) {
               <WalletListSwipeable
                 key="fullList"
                 header={renderHeader}
-                footer={undefined}
+                footer={hasRestoreWallets ? renderListFooter : undefined}
                 navigation={navigation}
                 insetStyle={insetStyle}
                 searching={isSearching}
                 searchText={searchText}
-                onRefresh={handleRefresh}
-                onReset={handleReset}
               />
               <WalletListSortable insetStyle={insetStyle} key="sortList" />
             </CrossFade>

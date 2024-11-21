@@ -54,6 +54,8 @@ export const fadeInDown110: Anim = { type: 'fadeInDown', distance: 110 }
 export const fadeInDown120: Anim = { type: 'fadeInDown', distance: 120 }
 export const fadeInDown140: Anim = { type: 'fadeInDown', distance: 140 }
 export const fadeInLeft: Anim = { type: 'fadeInLeft' }
+export const fadeInRight: Anim = { type: 'fadeInRight' }
+
 export const fadeOut: Anim = { type: 'fadeOut' }
 
 type AnimBuilder = typeof ComplexAnimationBuilder
@@ -63,7 +65,7 @@ type AnimTypeStretchIns = 'stretchInY'
 type AnimTypeStretchOuts = 'stretchOutY'
 type AnimType = AnimTypeFadeIns | AnimTypeFadeOuts | AnimTypeStretchIns | AnimTypeStretchOuts
 
-interface Anim {
+export interface Anim {
   type: AnimType
   delay?: number
   duration?: number

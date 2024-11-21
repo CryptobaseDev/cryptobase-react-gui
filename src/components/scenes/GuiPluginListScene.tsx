@@ -6,12 +6,12 @@ import { Image, ListRenderItemInfo, Platform, View } from 'react-native'
 import { getBuildNumber, getVersion } from 'react-native-device-info'
 import FastImage from 'react-native-fast-image'
 import Animated from 'react-native-reanimated'
-import { sprintf } from 'sprintf-js'
 
 import { checkAndShowLightBackupModal } from '../../actions/BackupModalActions'
 import { checkAndSetRegion, showCountrySelectionModal } from '../../actions/CountryListActions'
 import { getDeviceSettings, writeDeveloperPluginUri } from '../../actions/DeviceSettingsActions'
 import { NestedDisableMap } from '../../actions/ExchangeInfoActions'
+import paymentTypeLogoApplePay from '../../assets/images/paymentTypes/paymentTypeLogoApplePay.png'
 import { FLAG_LOGO_URL } from '../../constants/CdnConstants'
 import { COUNTRY_CODES } from '../../constants/CountryConstants'
 import buyPluginJsonRaw from '../../constants/plugins/buyPluginList.json'
@@ -28,7 +28,7 @@ import { SceneScrollHandler, useSceneScrollHandler } from '../../state/SceneScro
 import { asBuySellPlugins, asGuiPluginJson, BuySellPlugins, GuiPluginRow } from '../../types/GuiPluginTypes'
 import { useDispatch, useSelector } from '../../types/reactRedux'
 import { AccountReferral } from '../../types/ReferralTypes'
-import { EdgeSceneProps } from '../../types/routerTypes'
+import { BuyTabSceneProps, NavigationBase } from '../../types/routerTypes'
 import { PluginTweak } from '../../types/TweakTypes'
 import { getPartnerIconUri } from '../../util/CdnUris'
 import { getCurrencyCodeWithAccount } from '../../util/CurrencyInfoHelpers'
@@ -36,9 +36,10 @@ import { filterGuiPluginJson } from '../../util/GuiPluginTools'
 import { infoServerData } from '../../util/network'
 import { bestOfPlugins } from '../../util/ReferralHelpers'
 import { logEvent, OnLogEvent } from '../../util/tracking'
+import { getUkCompliantString } from '../../util/ukComplianceUtils'
 import { base58ToUuid, getOsVersion } from '../../util/utils'
 import { EdgeCard } from '../cards/EdgeCard'
-import { filterPromoCards } from '../cards/PromoCards'
+import { filterInfoCards } from '../cards/InfoCardCarousel'
 import { EdgeAnim, fadeInUp20, fadeInUp30, fadeInUp60, fadeInUp90 } from '../common/EdgeAnim'
 import { InsetStyle, SceneWrapper } from '../common/SceneWrapper'
 import { SectionHeader } from '../common/SectionHeader'
@@ -81,8 +82,10 @@ const paymentTypeLogosById = {
   interac: 'paymentTypeLogoInterac',
   payid: 'paymentTypeLogoPayid',
   paynow: 'paymentTypeLogoPaynow',
+  paypal: 'paymentTypeLogoPaypal',
   pix: 'paymentTypeLogoPix',
   poli: 'paymentTypeLogoPoli',
+  revolut: 'paymentTypeLogoRevolut',
   sofort: 'paymentTypeLogoSofort',
   upi: 'paymentTypeLogoUpi',
   visa: 'paymentTypeVisa'
@@ -91,7 +94,7 @@ const pluginPartnerLogos: { [key: string]: 'guiPluginLogoMoonpay' } = {
   moonpay: 'guiPluginLogoMoonpay'
 }
 
-interface OwnProps extends EdgeSceneProps<'pluginListBuy' | 'pluginListSell'> {}
+interface OwnProps extends BuyTabSceneProps<'pluginListBuy' | 'pluginListSell'> {}
 
 interface StateProps {
   account: EdgeAccount
@@ -233,7 +236,7 @@ class GuiPluginList extends React.PureComponent<Props, State> {
 
     // Don't allow light accounts to enter buy webview plugins
     const direction = this.getSceneDirection()
-    if (direction === 'buy' && plugin.nativePlugin == null && checkAndShowLightBackupModal(account, navigation)) return
+    if (direction === 'buy' && plugin.nativePlugin == null && checkAndShowLightBackupModal(account, navigation as NavigationBase)) return
 
     // Grab a custom URI if necessary:
     let { deepPath = undefined } = listRow
@@ -262,7 +265,7 @@ class GuiPluginList extends React.PureComponent<Props, State> {
     }
     if (plugin.nativePlugin != null) {
       const cards = infoServerData.rollup?.promoCards2 ?? []
-      const promoCards = filterPromoCards({
+      const promoCards = filterInfoCards({
         accountReferral,
         cards,
         countryCode,
@@ -295,7 +298,7 @@ class GuiPluginList extends React.PureComponent<Props, State> {
         forcedWalletResult,
         guiPlugin: plugin,
         longPress,
-        navigation,
+        navigation: navigation as NavigationBase,
         paymentType,
         pluginPromotion,
         regionCode: { countryCode, stateProvinceCode },
@@ -314,6 +317,30 @@ class GuiPluginList extends React.PureComponent<Props, State> {
     onPluginOpened()
   }
 
+  renderTitle = (guiPluginRow: GuiPluginRow) => {
+    const styles = getStyles(this.props.theme)
+    const { title, customTitleKey } = guiPluginRow
+
+    switch (customTitleKey) {
+      case 'applepay':
+        // Per Apple branding guidelines, "Pay With" is NOT to be translated.
+        return (
+          <View style={styles.titleAppleContainer}>
+            <EdgeText style={styles.titleText} numberOfLines={1}>
+              {'Pay with '}
+            </EdgeText>
+            <Image style={styles.titleAppleLogo} source={paymentTypeLogoApplePay} />
+          </View>
+        )
+      default:
+        return (
+          <EdgeText style={styles.titleText} numberOfLines={1}>
+            {title}
+          </EdgeText>
+        )
+    }
+  }
+
   renderPlugin = ({ item, index }: ListRenderItemInfo<GuiPluginRow>) => {
     const { theme } = this.props
     const { pluginId } = item
@@ -326,7 +353,6 @@ class GuiPluginList extends React.PureComponent<Props, State> {
     const partnerLogoThemeKey = pluginPartnerLogos[pluginId]
     const pluginPartnerLogo = partnerLogoThemeKey ? theme[partnerLogoThemeKey] : { uri: getPartnerIconUri(item.partnerIconPath ?? '') }
     const poweredBy = plugin.poweredBy ?? plugin.displayName
-
     return (
       <EdgeAnim enter={{ type: 'fadeInDown', distance: 30 * (index + 1) }} style={styles.hackContainer}>
         <EdgeCard
@@ -342,9 +368,7 @@ class GuiPluginList extends React.PureComponent<Props, State> {
           paddingRem={[1, 0.5, 1, 0.5]}
         >
           <View style={styles.cardContentContainer}>
-            <EdgeText style={styles.titleText} numberOfLines={1}>
-              {item.title}
-            </EdgeText>
+            {this.renderTitle(item)}
             {item.description === '' ? null : <EdgeText style={styles.subtitleText}>{item.description}</EdgeText>}
             {poweredBy != null && item.partnerIconPath != null ? (
               <>
@@ -375,11 +399,12 @@ class GuiPluginList extends React.PureComponent<Props, State> {
     const countryName = hasCountryData ? countryData.name : lstrings.buy_sell_crypto_select_country_button
     const iconStyle = stateProvinceData == null ? styles.selectedCountryFlag : styles.selectedCountryFlagSelectableRow
     const icon = !hasCountryData ? undefined : <FastImage source={imageSrc} style={iconStyle} />
+    const forcedWallet = forcedWalletResult?.type === 'wallet' ? account.currencyWallets[forcedWalletResult.walletId] : undefined
 
     const titleAsset =
-      forcedWalletResult == null || forcedWalletResult.type !== 'wallet'
+      forcedWalletResult == null || forcedWalletResult.type !== 'wallet' || forcedWallet == null
         ? lstrings.cryptocurrency
-        : getCurrencyCodeWithAccount(account, account.currencyWallets[forcedWalletResult.walletId].currencyInfo.pluginId, forcedWalletResult.tokenId ?? null)
+        : getCurrencyCodeWithAccount(account, forcedWallet.currencyInfo.pluginId, forcedWalletResult.tokenId) ?? ''
 
     const countryCard =
       stateProvinceData == null ? (
@@ -394,7 +419,9 @@ class GuiPluginList extends React.PureComponent<Props, State> {
       <>
         <EdgeAnim style={styles.header} enter={fadeInUp90}>
           <SceneHeader
-            title={direction === 'buy' ? sprintf(lstrings.title_plugin_buy_s, titleAsset) : sprintf(lstrings.title_plugin_sell_s, titleAsset)}
+            title={
+              direction === 'buy' ? getUkCompliantString(countryCode, 'buy_1s_quote', titleAsset) : getUkCompliantString(countryCode, 'sell_1s', titleAsset)
+            }
             underline
             withTopMargin
           />
@@ -525,6 +552,19 @@ const getStyles = cacheStyles((theme: Theme) => ({
   },
   titleText: {
     fontFamily: theme.fontFaceMedium
+  },
+  titleAppleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    flexShrink: 1
+  },
+  titleAppleLogo: {
+    height: theme.rem(1),
+    width: 'auto',
+    aspectRatio: 150 / 64,
+    resizeMode: 'contain',
+    marginBottom: 1
   },
   subtitleText: {
     marginTop: theme.rem(0.25),

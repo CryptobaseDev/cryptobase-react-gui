@@ -1,5 +1,5 @@
 import { add, gt } from 'biggystring'
-import { EdgeCurrencyWallet, EdgeDenomination } from 'edge-core-js'
+import { EdgeCurrencyWallet, EdgeDenomination, EdgeTokenId } from 'edge-core-js'
 import * as React from 'react'
 import { Image, View } from 'react-native'
 import { sprintf } from 'sprintf-js'
@@ -14,7 +14,7 @@ import { lstrings } from '../../../locales/strings'
 import { getExchangeDenomByCurrencyCode, selectDisplayDenomByCurrencyCode } from '../../../selectors/DenominationSelectors'
 import { convertCurrency } from '../../../selectors/WalletSelectors'
 import { connect } from '../../../types/reactRedux'
-import { EdgeSceneProps } from '../../../types/routerTypes'
+import { EdgeAppSceneProps } from '../../../types/routerTypes'
 import { getCurrencyCode } from '../../../util/CurrencyInfoHelpers'
 import { getFioStakingBalances } from '../../../util/stakeUtils'
 import { convertNativeToDenomination } from '../../../util/utils'
@@ -26,7 +26,12 @@ import { cacheStyles, Theme, ThemeProps, withTheme } from '../../services/ThemeC
 import { EdgeText } from '../../themed/EdgeText'
 import { SceneHeader } from '../../themed/SceneHeader'
 
-interface OwnProps extends EdgeSceneProps<'fioStakingOverview'> {}
+export interface FioStakingOverviewParams {
+  tokenId: EdgeTokenId
+  walletId: string
+}
+
+interface OwnProps extends EdgeAppSceneProps<'fioStakingOverview'> {}
 
 interface StateProps {
   currencyWallet: EdgeCurrencyWallet
@@ -93,10 +98,10 @@ export const FioStakingOverviewSceneComponent = (props: Props) => {
   }, [stakingStatus, currencyDenomination])
 
   const handlePressStake = () => {
-    navigation.navigate('fioStakingChange', { change: 'add', tokenId, walletId })
+    navigation.navigate('fioStakingChange', { assetActionType: 'stake', tokenId, walletId })
   }
   const handlePressUnstake = () => {
-    navigation.navigate('fioStakingChange', { change: 'remove', tokenId, walletId })
+    navigation.navigate('fioStakingChange', { assetActionType: 'unstake', tokenId, walletId })
   }
 
   const renderItems = () =>
@@ -135,7 +140,7 @@ export const FioStakingOverviewSceneComponent = (props: Props) => {
 
       <ButtonsView
         parentType="scene"
-        primary={{ label: lstrings.staking_stake_funds_button, onPress: handlePressStake }}
+        primary={{ label: lstrings.fragment_stake_label, onPress: handlePressStake }}
         tertiary={{ label: lstrings.staking_unstake_funds_button, onPress: handlePressUnstake }}
       />
     </>

@@ -1,5 +1,5 @@
 import { useIsFocused } from '@react-navigation/native'
-import { add, div, gte, toFixed } from 'biggystring'
+import { add, div, gt, gte, toFixed } from 'biggystring'
 import { EdgeSwapQuote, EdgeSwapResult } from 'edge-core-js'
 import React, { useState } from 'react'
 import { SectionList, View, ViewStyle } from 'react-native'
@@ -17,14 +17,14 @@ import { getExchangeDenom, selectDisplayDenom } from '../../selectors/Denominati
 import { convertCurrency } from '../../selectors/WalletSelectors'
 import { useDispatch, useSelector } from '../../types/reactRedux'
 import { ThunkAction } from '../../types/reduxTypes'
-import { EdgeSceneProps } from '../../types/routerTypes'
+import { SwapTabSceneProps } from '../../types/routerTypes'
 import { GuiSwapInfo } from '../../types/types'
 import { getSwapPluginIconUri } from '../../util/CdnUris'
 import { CryptoAmount } from '../../util/CryptoAmount'
 import { getCurrencyCode } from '../../util/CurrencyInfoHelpers'
 import { logActivity } from '../../util/logger'
 import { logEvent } from '../../util/tracking'
-import { convertNativeToExchange, DECIMAL_PRECISION } from '../../util/utils'
+import { convertCurrencyFromExchangeRates, convertNativeToExchange, DECIMAL_PRECISION } from '../../util/utils'
 import { AlertCardUi4 } from '../cards/AlertCard'
 import { PoweredByCard } from '../cards/PoweredByCard'
 import { EdgeAnim, fadeInDown30, fadeInDown60, fadeInDown90, fadeInDown120, fadeInUp30, fadeInUp60, fadeInUp90 } from '../common/EdgeAnim'
@@ -50,7 +50,7 @@ export interface SwapConfirmationParams {
   onApprove: () => void
 }
 
-interface Props extends EdgeSceneProps<'swapConfirmation'> {}
+interface Props extends SwapTabSceneProps<'swapConfirmation'> {}
 
 interface Section {
   title: { title: string; rightTitle: string }
@@ -66,6 +66,16 @@ export const SwapConfirmationScene = (props: Props) => {
   const styles = getStyles(theme)
 
   const account = useSelector(state => state.core.account)
+  const feeFiat = useSelector(state =>
+    selectedQuote == null
+      ? '0'
+      : convertCurrencyFromExchangeRates(
+          state.exchangeRates,
+          selectedQuote.networkFee.currencyCode,
+          state.ui.settings.defaultIsoFiat,
+          selectedQuote.networkFee.nativeAmount
+        )
+  )
   const [pending, setPending] = useState(false)
 
   const swapRequestOptions = useSwapRequestOptions()
@@ -108,7 +118,7 @@ export const SwapConfirmationScene = (props: Props) => {
   const swapConfig = account.swapConfig[pluginId]
   const exchangeName = swapConfig?.swapInfo.displayName ?? '' // HACK: for unit tests to run
   const feePercent = div(selectedQuote.networkFee.nativeAmount, selectedQuote.fromNativeAmount, 2)
-  const showFeeWarning = gte(feePercent, '0.05')
+  const showFeeWarning = gt(feeFiat, '0.01') && gte(feePercent, '0.05')
 
   const handleExchangeTimerExpired = useHandler(() => {
     if (!isFocused) return
@@ -176,7 +186,10 @@ export const SwapConfirmationScene = (props: Props) => {
         nativeAmount ${networkFee.nativeAmount}
 `)
 
-      navigation.push('swapSuccess', {})
+      navigation.push('swapSuccess', {
+        edgeTransaction: result.transaction,
+        walletId: request.fromWallet.id
+      })
 
       // Dispatch the success action and callback
       onApprove()

@@ -5,6 +5,7 @@
  *   - edge://<type>/...
  *   - airbitz://<type>/...
  *   - https://deep.edge.app/<type>/...
+ *   - https://dp.edge.app/<type>/...
  *
  * The `edge://` protocol supports the following link types:
  *
@@ -33,7 +34,6 @@
  */
 import { asValue } from 'cleaners'
 
-import { PriceChangePayload } from '../controllers/action-queue/types/pushPayloadTypes'
 import { FiatDirection, FiatPaymentType } from '../plugins/gui/fiatPluginTypes'
 import { AppParamList } from './routerTypes'
 
@@ -72,10 +72,26 @@ export interface FiatPluginLink {
   paymentType?: FiatPaymentType
 }
 
+export interface FiatProviderLink {
+  type: 'fiatProvider'
+  direction: FiatDirection
+  providerId: string
+  path: string
+  query: { [key: string]: string | null }
+  uri: string
+}
+
 export interface PromotionLink {
   type: 'promotion'
   installerId?: string
 }
+
+export interface PriceChangeLink {
+  type: 'price-change'
+  pluginId: string
+  body: string // Human-readable message
+}
+
 export interface RequestAddressLink {
   type: 'requestAddress'
   assets: Array<{ nativeCode: string; tokenCode: string }>
@@ -117,12 +133,13 @@ export type DeepLink =
   | SceneLink
   | EdgeLoginLink
   | FiatPluginLink
+  | FiatProviderLink
   | ModalLink
   | NoopLink
   | PasswordRecoveryLink
   | PaymentProtoLink
   | PluginLink
-  | PriceChangePayload
+  | PriceChangeLink
   | PromotionLink
   | RequestAddressLink
   | SwapLink

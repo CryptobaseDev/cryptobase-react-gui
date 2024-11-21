@@ -1,6 +1,7 @@
 import { eq, lte, mul, round } from 'biggystring'
 import { asArray, asBoolean, asDate, asMaybe, asObject, asOptional, asString, asValue } from 'cleaners'
 import { EdgeAssetAction, EdgeFetchOptions, EdgeSpendInfo, EdgeTxActionFiat, JsonObject } from 'edge-core-js'
+import { sprintf } from 'sprintf-js'
 import URL from 'url-parse'
 
 import { SendScene2Params } from '../../../components/scenes/SendScene2'
@@ -10,7 +11,7 @@ import { EdgeAsset, StringMap } from '../../../types/types'
 import { sha512HashAndSign } from '../../../util/crypto'
 import { CryptoAmount } from '../../../util/CryptoAmount'
 import { removeIsoPrefix } from '../../../util/utils'
-import { SendErrorNoTransaction } from '../fiatPlugin'
+import { SendErrorBackPressed, SendErrorNoTransaction } from '../fiatPlugin'
 import { FiatDirection, FiatPaymentType, FiatPluginUi, SaveTxActionParams } from '../fiatPluginTypes'
 import {
   FiatProvider,
@@ -42,6 +43,7 @@ const allowedPaymentTypes: AllowedPaymentTypes = {
     googlepay: true,
     pix: true,
     pse: true,
+    revolut: true,
     spei: true
   },
   sell: {
@@ -64,6 +66,7 @@ const asApiKeys = asObject({
 const asPaymentMethodId = asValue(
   'method-id-credit-card',
   'method-id-credit-card-out',
+  'method-id_bridgerpay_revolutpay',
 
   // XXX Hack. Fake payment methods for googlepay/applepay
   'fake-id-googlepay',
@@ -193,7 +196,7 @@ const asQuote = asObject({
 
 const asPaymentDetails = asObject({
   assetId: asString,
-  invoice: asString,
+  // invoice: asString,
   blockchain: asString,
   network: asString,
   depositAddress: asString,
@@ -238,37 +241,38 @@ const FIAT_DECIMALS = -2
 const CRYPTO_DECIMALS = -8
 
 const PAYBIS_TO_EDGE_CURRENCY_MAP: Record<string, ExtendedTokenId> = {
+  AAVE: { pluginId: 'ethereum', tokenId: '7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9' },
   ADA: { pluginId: 'cardano', tokenId: null },
-  BNB: { pluginId: 'binancechain', tokenId: null },
+  BAT: { pluginId: 'ethereum', tokenId: '0d8775f648430679a709e98d2b0cb6250d2887ef' },
   BCH: { pluginId: 'bitcoincash', tokenId: null },
+  BNB: { pluginId: 'binancechain', tokenId: null },
   BTC: { pluginId: 'bitcoin', tokenId: null },
-  'BTC-TESTNET': { pluginId: 'bitcointestnet', currencyCode: 'TESTBTC', tokenId: null },
+  'BTC-TESTNET': { currencyCode: 'TESTBTC', pluginId: 'bitcointestnet', tokenId: null },
+  BUSD: { pluginId: 'binancesmartchain', tokenId: 'e9e7cea3dedca5984780bafc599bd69add087d56' },
+  COMP: { pluginId: 'ethereum', tokenId: 'c00e94cb662c3520282e6f5717214004a7f26888' },
+  CRV: { pluginId: 'ethereum', tokenId: 'd533a949740bb3306d119cc777fa900ba034cd52' },
+  DAI: { pluginId: 'ethereum', tokenId: '6b175474e89094c44da98b954eedeac495271d0f' },
   DOGE: { pluginId: 'dogecoin', tokenId: null },
-  ETH: { pluginId: 'ethereum', tokenId: null },
-  LTC: { pluginId: 'litecoin', tokenId: null },
   DOT: { pluginId: 'polkadot', tokenId: null },
-  'MATIC-POLYGON': { pluginId: 'polygon', currencyCode: 'MATIC', tokenId: null },
+  ETH: { pluginId: 'ethereum', tokenId: null },
+  KNC: { pluginId: 'ethereum', tokenId: 'defa4e8a7bcba345f687a2f1456f5edd9ce97202' },
+  LINK: { pluginId: 'ethereum', tokenId: '514910771af9ca656af840dff83e8264ecf986ca' },
+  LTC: { pluginId: 'litecoin', tokenId: null },
+  MKR: { pluginId: 'ethereum', tokenId: '9f8f72aa9304c8b593d555f12ef6589cc3a579a2' },
+  POL: { currencyCode: 'POL', pluginId: 'polygon', tokenId: null },
+  SHIB: { pluginId: 'ethereum', tokenId: '95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce' },
   SOL: { pluginId: 'solana', tokenId: null },
+  SUSHI: { pluginId: 'ethereum', tokenId: '6b3595068778dd592e39a122f4f5a5cf09c90fe2' },
+  TON: { pluginId: 'ton', tokenId: null },
   TRX: { pluginId: 'tron', tokenId: null },
+  USDC: { pluginId: 'ethereum', tokenId: 'a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' },
+  USDT: { pluginId: 'ethereum', tokenId: 'dac17f958d2ee523a2206206994597c13d831ec7' },
+  'USDT-TRC20': { currencyCode: 'USDT', pluginId: 'tron', tokenId: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' },
+  WBTC: { pluginId: 'ethereum', tokenId: '2260fac5e5542a773aa44fbcfedf7c193bc2c599' },
   XLM: { pluginId: 'stellar', tokenId: null },
   XRP: { pluginId: 'ripple', tokenId: null },
   XTZ: { pluginId: 'tezos', tokenId: null },
-  USDT: { pluginId: 'ethereum', tokenId: 'dac17f958d2ee523a2206206994597c13d831ec7' },
-  USDC: { pluginId: 'ethereum', tokenId: 'a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' },
-  SHIB: { pluginId: 'ethereum', tokenId: '95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce' },
-  WBTC: { pluginId: 'ethereum', tokenId: '2260fac5e5542a773aa44fbcfedf7c193bc2c599' },
-  DAI: { pluginId: 'ethereum', tokenId: '6b175474e89094c44da98b954eedeac495271d0f' },
-  LINK: { pluginId: 'ethereum', tokenId: '514910771af9ca656af840dff83e8264ecf986ca' },
-  MKR: { pluginId: 'ethereum', tokenId: '9f8f72aa9304c8b593d555f12ef6589cc3a579a2' },
-  AAVE: { pluginId: 'ethereum', tokenId: '7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9' },
-  BAT: { pluginId: 'ethereum', tokenId: '0d8775f648430679a709e98d2b0cb6250d2887ef' },
-  CRV: { pluginId: 'ethereum', tokenId: 'd533a949740bb3306d119cc777fa900ba034cd52' },
-  COMP: { pluginId: 'ethereum', tokenId: 'c00e94cb662c3520282e6f5717214004a7f26888' },
-  YFI: { pluginId: 'ethereum', tokenId: '0bc529c00c6401aef6d220be8c6ea1667f6ad93e' },
-  KNC: { pluginId: 'ethereum', tokenId: 'defa4e8a7bcba345f687a2f1456f5edd9ce97202' },
-  SUSHI: { pluginId: 'ethereum', tokenId: '6b3595068778dd592e39a122f4f5a5cf09c90fe2' },
-  'USDT-TRC20': { pluginId: 'tron', tokenId: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', currencyCode: 'USDT' },
-  BUSD: { pluginId: 'binancesmartchain', tokenId: 'e9e7cea3dedca5984780bafc599bd69add087d56' }
+  YFI: { pluginId: 'ethereum', tokenId: '0bc529c00c6401aef6d220be8c6ea1667f6ad93e' }
 }
 
 const EDGE_TO_PAYBIS_CURRENCY_MAP: StringMap = Object.entries(PAYBIS_TO_EDGE_CURRENCY_MAP).reduce((prev, [paybisCc, edgeToken]) => {
@@ -278,6 +282,7 @@ const EDGE_TO_PAYBIS_CURRENCY_MAP: StringMap = Object.entries(PAYBIS_TO_EDGE_CUR
 const PAYMENT_METHOD_MAP: { [Payment in PaymentMethodId]: FiatPaymentType } = {
   'method-id-credit-card': 'credit',
   'method-id-credit-card-out': 'credit',
+  'method-id_bridgerpay_revolutpay': 'revolut',
 
   // XXX Hack. Fake payment methods for googlepay/applepay
   'fake-id-googlepay': 'googlepay',
@@ -302,6 +307,7 @@ const REVERSE_PAYMENT_METHOD_MAP: Partial<{ [Payment in FiatPaymentType]: Paymen
   googlepay: 'method-id-credit-card',
   pix: 'method-id_bridgerpay_directa24_pix',
   pse: 'method-id_bridgerpay_directa24_pse',
+  revolut: 'method-id_bridgerpay_revolutpay',
   spei: 'method-id_bridgerpay_directa24_spei'
 }
 
@@ -345,6 +351,10 @@ export const paybisProvider: FiatProviderFactory = {
       partnerIcon,
       pluginDisplayName,
       getSupportedAssets: async ({ direction, paymentTypes, regionCode }): Promise<FiatProviderAssetMap> => {
+        // Do not allow sell to debit in US, disable all UK
+        if (regionCode.countryCode === 'GB' || (direction === 'sell' && paymentTypes.includes('credit') && regionCode.countryCode === 'US')) {
+          throw new FiatProviderError({ providerId, errorType: 'paymentUnsupported' })
+        }
         validateRegion(providerId, regionCode, SUPPORTED_REGIONS)
         // Return nothing if paymentTypes are not supported by this provider
         const paymentType = paymentTypes.find(paymentType => allowedPaymentTypes[direction][paymentType] === true)
@@ -576,14 +586,55 @@ export const paybisProvider: FiatProviderFactory = {
             const promoCodeParam = promoCode != null ? `&promoCode=${promoCode}` : ''
 
             if (direction === 'buy') {
+              const successReturnURL = encodeURIComponent('https://return.edge.app/fiatprovider/buy/paybis?transactionStatus=success')
+              const failureReturnURL = encodeURIComponent('https://return.edge.app/fiatprovider/buy/paybis?transactionStatus=fail')
               await showUi.openExternalWebView({
-                url: `${widgetUrl}?requestId=${requestId}${ott}${promoCodeParam}`
+                url: `${widgetUrl}?requestId=${requestId}${ott}${promoCodeParam}&successReturnURL=${successReturnURL}&failureReturnURL=${failureReturnURL}`,
+                providerId,
+                deeplinkHandler: async link => {
+                  const { query, uri } = link
+                  console.log('Paybis WebView launch buy success: ' + uri)
+                  const { transactionStatus } = query
+                  if (transactionStatus === 'success') {
+                    await showUi.trackConversion('Buy_Success', {
+                      conversionValues: {
+                        conversionType: 'buy',
+                        sourceFiatCurrencyCode: fiatCurrencyCode,
+                        sourceFiatAmount: fiatAmount,
+                        destAmount: new CryptoAmount({
+                          currencyConfig: coreWallet.currencyConfig,
+                          currencyCode: displayCurrencyCode,
+                          exchangeAmount: cryptoAmount
+                        }),
+                        fiatProviderId: providerId,
+                        orderId: requestId
+                      }
+                    })
+                    const message =
+                      sprintf(lstrings.fiat_plugin_buy_complete_message_s, cryptoAmount, displayCurrencyCode, fiatAmount, fiat, '1') +
+                      '\n\n' +
+                      sprintf(lstrings.fiat_plugin_buy_complete_message_2_hour_s, '1') +
+                      '\n\n' +
+                      lstrings.fiat_plugin_sell_complete_message_3
+                    await showUi.buttonModal({
+                      buttons: {
+                        ok: { label: lstrings.string_ok, type: 'primary' }
+                      },
+                      title: lstrings.fiat_plugin_buy_complete_title,
+                      message
+                    })
+                  } else if (transactionStatus === 'failure') {
+                    await showUi.showToast(lstrings.fiat_plugin_buy_failed_try_again, NOT_SUCCESS_TOAST_HIDE_MS)
+                  } else {
+                    await showUi.showError(new Error(`Paybis: Invalid transactionStatus "${transactionStatus}".`))
+                  }
+                }
               })
               return
             }
 
-            const successReturnURL = encodeURI(RETURN_URL_SUCCESS)
-            const failureReturnURL = encodeURI(RETURN_URL_FAIL)
+            const successReturnURL = encodeURIComponent(RETURN_URL_SUCCESS)
+            const failureReturnURL = encodeURIComponent(RETURN_URL_FAIL)
             const webviewUrl = `${widgetUrl}?requestId=${requestId}&successReturnURL=${successReturnURL}&failureReturnURL=${failureReturnURL}${ott}${promoCodeParam}`
             console.log(`webviewUrl: ${webviewUrl}`)
             let inPayment = false
@@ -601,7 +652,7 @@ export const paybisProvider: FiatProviderFactory = {
                     inPayment = true
                     try {
                       const payDetails = await paybisFetch({ method: 'GET', url, path: `v2/request/${requestId}/payment-details`, apiKey, promoCode })
-                      const { assetId, amount, currencyCode: pbCurrencyCode, invoice, network, depositAddress, destinationTag } = asPaymentDetails(payDetails)
+                      const { assetId, amount, currencyCode: pbCurrencyCode, network, depositAddress, destinationTag } = asPaymentDetails(payDetails)
                       const { pluginId, tokenId } = PAYBIS_TO_EDGE_CURRENCY_MAP[assetId]
 
                       console.log(`Creating Paybis payment`)
@@ -618,7 +669,7 @@ export const paybisProvider: FiatProviderFactory = {
                       }
                       const savedAction: EdgeTxActionFiat = {
                         actionType: 'fiat',
-                        orderId: invoice,
+                        orderId: requestId,
                         orderUri: `${widgetUrl}?requestId=${requestId}`,
                         isEstimate: true,
                         fiatPlugin: {
@@ -686,7 +737,7 @@ export const paybisProvider: FiatProviderFactory = {
                             exchangeAmount: amount
                           }),
                           fiatProviderId: providerId,
-                          orderId: invoice
+                          orderId: requestId
                         }
                       })
 
@@ -705,12 +756,14 @@ export const paybisProvider: FiatProviderFactory = {
                       // Route back to the original URL to show Paybis confirmation screen
                       await showUi.exitScene()
                       await openWebView()
-                    } catch (e: any) {
+                    } catch (e: unknown) {
                       await showUi.exitScene()
                       // Reopen the webivew on the Paybis payment screen
                       await openWebView()
-                      if (e.message === SendErrorNoTransaction) {
+                      if (e instanceof Error && e.message === SendErrorNoTransaction) {
                         await showUi.showToast(lstrings.fiat_plugin_sell_failed_to_send_try_again, NOT_SUCCESS_TOAST_HIDE_MS)
+                      } else if (e instanceof Error && e.message === SendErrorBackPressed) {
+                        // Do nothing
                       } else {
                         await showUi.showError(e)
                       }
